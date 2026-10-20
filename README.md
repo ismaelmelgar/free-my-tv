@@ -9,7 +9,7 @@
 Trending picks from your own apps, the weather at a glance, and a look that follows the sunset.<br>
 Open source. Built with Claude Code. One button to undo.
 
-[**freemytv.io**](https://freemytv.io) · [Install](#install) · [Any TV](#any-tv) · [Make it yours](#make-it-yours)
+[**freemytv.io**](https://freemytv.io) · [Install](#install) · [Any TV](#any-tv) · [Android 9](#android-9-and-older-boxes) · [Make it yours](#make-it-yours)
 
 <img src=".github/preview.webp" width="880" alt="The Free My TV home screen: a glass shelf of apps, trending picks, and a drawer with the weather and crypto prices">
 
@@ -123,6 +123,41 @@ Free My TV runs on Google TV and Android TV: TCL, Sony, Hisense, Philips, Xiaomi
 | Apps never to touch | `PROTECTED` in the same file |
 | Apps on the shelf | `SHELF` in [`HomeApps.java`](app/src/io/freemytv/HomeApps.java) |
 | Your brand's live TV app | `LIVE_TV_APPS` in the same file |
+
+## Android 9 and older boxes
+
+This fork runs on Android 9 and newer (upstream needs 12). I tested it on a **Xiaomi Mi Box 3** (MDZ-16-AB): Amlogic S905X, ARM Mali-450 MP3 GPU (OpenGL ES 2.0), 2 GB of RAM, Android TV 9, 1920×1080. Android 12 and newer draw exactly as upstream.
+
+**What's different on Android 9**
+
+- No frosted-glass shaders: the same flat look as upstream's Android 12 fallback.
+- `RenderNode` doesn't exist, so `Recording` falls back to a `Picture`.
+- There is no `cmd role` (already handled). The Google setup app is only turned off where it's a home screen (Google TV), not on Android TV 9.
+
+**Why it was slow, and what changed on Android 9 to 11 only** (`Ui.LEGACY`)
+
+The first Android 9 build, with only the compatibility fixes, took 64 ms a frame on the Mi Box (a 60 fps frame is 16.7 ms). The old GPU was redoing work on every frame, so the home screen now does it once:
+
+- **Shadows** are blurred once into cached bitmaps (`Shadows`) instead of on every frame: 64 → 24 ms.
+- **Rounded photos** use a shader instead of `clipPath`.
+- **No hardware layers**: drawing straight to the screen was cheaper on this GPU. Moving between the picks: 33 → 12 ms.
+- **Drawer cards** (weather, prices) are kept as bitmaps until their data changes: 31 → 9 ms.
+- **Prices and times** are formatted once.
+
+![Average frame time per action, before and now, on a Mi Box 3](.github/android9/frame-times.svg)
+
+![Free My TV against the Mi Box's stock launcher: frame time and memory](.github/android9/vs-stock.svg)
+
+Measured with `dumpsys gfxinfo framestats`, 120 frames per run. The stock launcher is Android TV Home (`com.google.android.tvlauncher`).
+
+| Action | Before | Now |
+|---|---|---|
+| Same key sequence as the stock launcher test (→→→ ←←← ↑↓) | 64 ms | 8.2 ms (stock launcher: 6.5 ms) |
+| Moving along the app shelf | 64 ms | 5.6 ms |
+| Moving between the picks | 49 ms | 10.8 ms |
+| Opening and closing the bottom drawer | 19 ms | 10.8 ms |
+| Moving focus inside the drawer | 31 ms | 9.1 ms (0 frames over 16.7 ms) |
+| Home screen memory (PSS) | n/a | 48 MB (stock launcher: 171 MB) |
 
 ## Make it yours
 
