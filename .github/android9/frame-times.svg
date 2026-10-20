@@ -1,36 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560" role="img" aria-label="Average frame time per action (ms, lower is better)">
-<rect width="760" height="560" rx="12" fill="#ffffff" stroke="#d0d7de"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 522" width="760" height="522" role="img" aria-label="Average frame time per action (ms, lower is better)">
+<rect width="760" height="522" rx="12" fill="#ffffff" stroke="#d0d7de"/>
 <text x="24" y="36" font-family="Helvetica,Arial,sans-serif" font-size="18" font-weight="700" fill="#1f2328">Average frame time per action (ms, lower is better)</text>
-<text x="24" y="56" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#57606a">Xiaomi Mi Box 3, 120 frames per run</text>
-<line x1="107.5" y1="76" x2="107.5" y2="520" stroke="#cf222e" stroke-dasharray="5 4"/>
-<text x="111.5" y="80" font-family="Helvetica,Arial,sans-serif" font-size="11" fill="#cf222e">16.7 ms (60 fps)</text>
-<text x="24" y="100" font-family="Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#1f2328">Same keys as the stock launcher test</text>
-<rect x="24" y="108" width="320.0" height="14" rx="3" fill="#8c959f"/>
-<text x="350.0" y="120" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">64 ms before</text>
-<rect x="24" y="126" width="41.0" height="14" rx="3" fill="#1a7f37"/>
-<text x="71.0" y="138" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">8.2 ms now (stock launcher: 6.5 ms)</text>
-<line x1="56.5" y1="106" x2="56.5" y2="142" stroke="#0969da" stroke-width="2"/>
-<text x="24" y="186" font-family="Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#1f2328">Moving along the app shelf</text>
-<rect x="24" y="194" width="320.0" height="14" rx="3" fill="#8c959f"/>
-<text x="350.0" y="206" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">64 ms before</text>
-<rect x="24" y="212" width="28.0" height="14" rx="3" fill="#1a7f37"/>
-<text x="58.0" y="224" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">5.6 ms now</text>
-<text x="24" y="272" font-family="Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#1f2328">Moving between the picks</text>
-<rect x="24" y="280" width="245.0" height="14" rx="3" fill="#8c959f"/>
-<text x="275.0" y="292" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">49 ms before</text>
-<rect x="24" y="298" width="54.0" height="14" rx="3" fill="#1a7f37"/>
-<text x="84.0" y="310" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">10.8 ms now</text>
-<text x="24" y="358" font-family="Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#1f2328">Opening/closing the bottom drawer</text>
-<rect x="24" y="366" width="95.0" height="14" rx="3" fill="#8c959f"/>
-<text x="125.0" y="378" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">19 ms before</text>
-<rect x="24" y="384" width="54.0" height="14" rx="3" fill="#1a7f37"/>
-<text x="84.0" y="396" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">10.8 ms now</text>
-<text x="24" y="444" font-family="Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#1f2328">Moving focus inside the drawer</text>
-<rect x="24" y="452" width="155.0" height="14" rx="3" fill="#8c959f"/>
-<text x="185.0" y="464" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">31 ms before</text>
-<rect x="24" y="470" width="45.5" height="14" rx="3" fill="#1a7f37"/>
-<text x="75.5" y="482" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">9.1 ms now</text>
-<rect x="24" y="532" width="12" height="12" fill="#8c959f"/><text x="42" y="542" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">Before (first Android 9 build, API fixes only)</text>
-<rect x="300" y="532" width="12" height="12" fill="#1a7f37"/><text x="318" y="542" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">Now</text>
-<rect x="370" y="532" width="12" height="12" fill="#0969da"/><text x="388" y="542" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">Stock launcher</text>
+<text x="24" y="56" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#57606a">Xiaomi Mi Box 3, 120 frames per run. Dashed red line: 16.7 ms, the 60 fps budget.</text>
+<text x="24" y="92" font-family="Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#1f2328">Same keys as the stock launcher test (→→→ ←←← ↑↓)</text>
+<rect x="24" y="102" width="512.0" height="14" rx="3" fill="#8c959f"/>
+<rect x="24" y="122" width="65.6" height="14" rx="3" fill="#1a7f37"/>
+<line x1="157.6" y1="98" x2="157.6" y2="140" stroke="#cf222e" stroke-dasharray="4 3" stroke-width="1.5"/>
+<line x1="76.0" y1="118" x2="76.0" y2="140" stroke="#0969da" stroke-width="2.5"/>
+<text x="736" y="133" font-family="Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#1f2328" text-anchor="end">64 → 8.2 ms (stock 6.5 ms)</text>
+<text x="24" y="172" font-family="Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#1f2328">Moving along the app shelf</text>
+<rect x="24" y="182" width="512.0" height="14" rx="3" fill="#8c959f"/>
+<rect x="24" y="202" width="44.8" height="14" rx="3" fill="#1a7f37"/>
+<line x1="157.6" y1="178" x2="157.6" y2="220" stroke="#cf222e" stroke-dasharray="4 3" stroke-width="1.5"/>
+<text x="736" y="213" font-family="Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#1f2328" text-anchor="end">64 → 5.6 ms</text>
+<text x="24" y="252" font-family="Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#1f2328">Moving between the picks</text>
+<rect x="24" y="262" width="392.0" height="14" rx="3" fill="#8c959f"/>
+<rect x="24" y="282" width="86.4" height="14" rx="3" fill="#1a7f37"/>
+<line x1="157.6" y1="258" x2="157.6" y2="300" stroke="#cf222e" stroke-dasharray="4 3" stroke-width="1.5"/>
+<text x="736" y="293" font-family="Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#1f2328" text-anchor="end">49 → 10.8 ms</text>
+<text x="24" y="332" font-family="Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#1f2328">Opening and closing the bottom drawer</text>
+<rect x="24" y="342" width="152.0" height="14" rx="3" fill="#8c959f"/>
+<rect x="24" y="362" width="86.4" height="14" rx="3" fill="#1a7f37"/>
+<line x1="157.6" y1="338" x2="157.6" y2="380" stroke="#cf222e" stroke-dasharray="4 3" stroke-width="1.5"/>
+<text x="736" y="373" font-family="Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#1f2328" text-anchor="end">19 → 10.8 ms</text>
+<text x="24" y="412" font-family="Helvetica,Arial,sans-serif" font-size="13" font-weight="600" fill="#1f2328">Moving focus inside the drawer</text>
+<rect x="24" y="422" width="248.0" height="14" rx="3" fill="#8c959f"/>
+<rect x="24" y="442" width="72.8" height="14" rx="3" fill="#1a7f37"/>
+<line x1="157.6" y1="418" x2="157.6" y2="460" stroke="#cf222e" stroke-dasharray="4 3" stroke-width="1.5"/>
+<text x="736" y="453" font-family="Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#1f2328" text-anchor="end">31 → 9.1 ms</text>
+<rect x="24" y="494" width="12" height="12" fill="#8c959f"/><text x="42" y="504" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">Before (first Android 9 build, API fixes only)</text>
+<rect x="330" y="494" width="12" height="12" fill="#1a7f37"/><text x="348" y="504" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">Now</text>
+<rect x="400" y="498" width="12" height="4" fill="#0969da"/><text x="418" y="504" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">Stock launcher</text>
+<line x1="530" y1="500" x2="548" y2="500" stroke="#cf222e" stroke-dasharray="4 3" stroke-width="1.5"/><text x="554" y="504" font-family="Helvetica,Arial,sans-serif" font-size="12" fill="#1f2328">16.7 ms (60 fps)</text>
 </svg>
