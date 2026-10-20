@@ -2,9 +2,9 @@
 
 <img src="docs/assets/icon-512.png" width="96" alt="">
 
-# Free My TV
+# Free My TV for Android 9
 
-**A fast, ad-free home screen for Google TV.**
+**A fast, ad-free home screen for Google TV and Android TV, now from Android 9: tuned for older boxes like the Mi Box 3.**
 
 Trending picks from your own apps, the weather at a glance, and a look that follows the sunset.<br>
 Open source. Built with Claude Code. One button to undo.
