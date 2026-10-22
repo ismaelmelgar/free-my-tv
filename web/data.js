@@ -30,7 +30,9 @@ var Place = (function () {
     country: country,
     currency: (CONFIG.currency || (country === 'BR' ? 'BRL' : EURO.test(country) ? 'EUR' : 'USD')).toUpperCase(),
     /** Fahrenheit for TVs in the US (by their time zone, or their language when it doesn't tell). */
-    fahrenheit: tz ? tz.country === 'US' : /-US$/i.test(navigator.language || '')
+    fahrenheit: tz ? tz.country === 'US' : /-US$/i.test(navigator.language || ''),
+    /** A 12-hour clock where it's the custom (by the time zone, or the language when it doesn't tell). */
+    twelveHour: tz ? /^(US|CA|AU|NZ|IN|PH)$/.test(tz.country) : /-(US|CA|AU|NZ|IN|PH)$/i.test(navigator.language || '')
   };
 })();
 
@@ -551,13 +553,13 @@ var Data = (function () {
     },
     hour: function (at) {
       var d = new Date(at), h = d.getHours();
-      if (I18N.lang === 'en') return (h % 12 || 12) + (h < 12 ? ' AM' : ' PM');
+      if (I18N.lang === 'en' && Place.twelveHour) return (h % 12 || 12) + (h < 12 ? ' AM' : ' PM');
       if (I18N.lang === 'de') return (h < 10 ? '0' : '') + h + ' Uhr';
-      return (I18N.lang === 'es' || I18N.lang === 'ru') ? (h < 10 ? '0' : '') + h + ':00' : h + 'h';
+      return (I18N.lang === 'en' || I18N.lang === 'es' || I18N.lang === 'ru') ? (h < 10 ? '0' : '') + h + ':00' : h + 'h';
     },
     time: function (at) {
       var d = new Date(at), h = d.getHours(), m = d.getMinutes();
-      if (I18N.lang === 'en') return (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM');
+      if (I18N.lang === 'en' && Place.twelveHour) return (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + (h < 12 ? ' AM' : ' PM');
       return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
     },
     /** "12 min ago" when the data is old (no internet), or empty. */
