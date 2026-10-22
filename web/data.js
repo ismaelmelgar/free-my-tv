@@ -50,6 +50,9 @@ var Prefs = (function () {
     quotes: function () { return pick('quotes', CONFIG.showCrypto !== false); },
     coin: function (i) { var c = pick('coins', null); return c ? c[i] !== false : true; },
     shelf: function () { return pick('shelf', null); },
+    /** Home Settings > Top of the screen: the picks (TMDB) or the clock ("none", as on Android). */
+    TOP_CONTENT: ['picks', 'none'],
+    topContent: function () { var t = pick('topContent', 'picks'); return this.TOP_CONTENT.indexOf(t) >= 0 ? t : 'picks'; },
     set: function (name, value) { v[name] = value; save(); this.version++; },
     setCoin: function (i, on) {
       var c = (pick('coins', null) || [true, true, true, true]).slice();
@@ -448,7 +451,7 @@ var Data = (function () {
 
   /** Fetches the list when stale (6 h, a new period of the day, language, key or apps), then this hour's details. */
   function refreshRecs() {
-    if (!KEY || fetchingRecs || !installed.length) return;
+    if (!KEY || fetchingRecs || !installed.length || Prefs.topContent() !== 'picks') return;
     var t = Date.now(), p = hourPeriod(new Date()), st = sourceStamp();
     if (st === stamp && failedAt && t - failedAt < 10 * 60000 && t >= failedAt) return;
     var stale = st !== stamp || p !== period || t - listAt > 6 * 3600000 || t < listAt || !picks.length || listLang !== I18N.lang;

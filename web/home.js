@@ -3,6 +3,7 @@
  *  - top: the "For You" title and the tabs (Explore, Movies, Shows); icon-only glass buttons at the right (Live TV,
  *    HDMI Inputs, Settings) and the crypto quotes at the end of the tab row;
  *  - three picks for this hour in the selected tab; the background is the first one's photo, blurred and almost white;
+ *    or, with Home Settings > Top of the screen > Clock (or no TMDB key), the date, the time and the weather instead;
  *  - the glass shelf with the apps; ↓ opens the drawer (inputs, shortcuts, weather, prices); ↑ or Back closes it;
  *  - a night look from sunset to sunrise; a screensaver after a few idle minutes.
  * The remote's arrows, OK and Back move the focus; a pointer (LG's Magic Remote) focuses what it points at.
@@ -148,7 +149,7 @@
     }
     list = $('buttons').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.TOP && st.top === 3 + i);
-    setClass($('quotes'), 'hide', st.zone === Z.TOP && st.top >= 3);
+    setClass($('quotes'), 'hide', st.zone === Z.TOP && st.top >= 3 && picksOn());
     list = $('cards').children;
     for (i = 0; i < list.length; i++) setClass(list[i], 'focus', st.zone === Z.CARDS && st.card === i);
     list = $('tiles').children;
@@ -192,8 +193,20 @@
 
   var TAB_KIND = [null, 'movie', 'tv'];
 
+  /** What the top shows (Home Settings > Top of the screen): the picks need a TMDB key, else it's the clock, as on Android. */
+  function topMode() {
+    var t = Prefs.topContent();
+    return t === 'picks' && !Data.hasKey() ? 'none' : t;
+  }
+
+  function picksOn() { return topMode() === 'picks'; }
+
+  /** The first top item that can take the focus: the selected tab, or the Live TV button when the tabs are gone. */
+  function firstTop() { return picksOn() ? st.tab : 3; }
+
   function renderTop() {
     $('title').textContent = tr('Para você', 'For You', 'Para ti');
+    setClass(body, 'top-clock', !picksOn());   // before the apps load, so the tabs don't flash
     var tabs = $('tabs');
     tabs.innerHTML = '';
     var names = [tr('Explorar', 'Explore', 'Explorar'), tr('Filmes', 'Movies', 'Películas'), tr('Séries', 'Shows', 'Series')];
@@ -227,9 +240,11 @@
   // MARK: - Picks and background
 
   function renderCards() {
-    var list = Data.picks(TAB_KIND[st.tab]);
+    var on = picksOn(), list = on ? Data.picks(TAB_KIND[st.tab]) : [];
     var holder = $('cards');
+    setClass(body, 'top-clock', !on);
     setClass(body, 'no-picks', !list.length);
+    if (!on && (st.zone === Z.CARDS || st.zone === Z.TOP && st.top < 3)) st.zone = Z.SHELF;
     var same = list.length === cards.length;
     for (var i = 0; same && i < list.length; i++) same = list[i].id === cards[i].id && list[i].backdrop === cards[i].backdrop && list[i].meta === cards[i].meta;
     if (same && holder.children.length === list.length) return;
@@ -278,12 +293,28 @@
 
   function renderClock() {
     var d = new Date(), c = $('clock');
-    c.firstChild.textContent = Data.time(d.getTime());
+    c.children[1].textContent = Data.time(d.getTime());
     try {
-      c.lastChild.textContent = d.toLocaleDateString(I18N.locale(), {weekday: 'long', day: 'numeric', month: 'long'});
+      c.children[0].textContent = d.toLocaleDateString(I18N.locale(), {weekday: 'long', day: 'numeric', month: 'long'});
     } catch (e) {
-      c.lastChild.textContent = d.toDateString();
+      c.children[0].textContent = d.toDateString();
     }
+    renderClockWeather();
+  }
+
+  /** Under the time: the weather now, its symbol, and the day's high and low (when the weather widget is on). */
+  function renderClockWeather() {
+    var line = $('clock').children[2], w = Data.weather;
+    line.innerHTML = '';
+    if (!Prefs.weather() || !w) return;
+    sym(Data.symbol(w.code, w.isDay), line);
+    line.appendChild(document.createTextNode(Data.degrees(w.temp) + '\u2002' + Data.condition(w.code, w.isDay) + '\u2003' + highLow(w, '\u2002')));
+  }
+
+  function highLow(w, space) {
+    if (I18N.lang === 'ru') return 'Макс. ' + Data.degrees(w.max) + space + 'Мин. ' + Data.degrees(w.min);
+    return tr('Máx. ' + Data.degrees(w.max) + space + 'Mín. ' + Data.degrees(w.min), 'H:' + Data.degrees(w.max) + space + 'L:' + Data.degrees(w.min),
+        'Máx. ' + Data.degrees(w.max) + space + 'Mín. ' + Data.degrees(w.min));
   }
 
   // MARK: - Shelf
@@ -385,8 +416,7 @@
     sym(Data.symbol(w.code, w.isDay), now);
     el('span', 'temp', now, Data.degrees(w.temp));
     el('div', 'cond', card, Data.condition(w.code, w.isDay));
-    el('div', 'range', card, I18N.lang === 'ru' ? 'Макс. ' + Data.degrees(w.max) + '   Мин. ' + Data.degrees(w.min) : tr('Máx. ' + Data.degrees(w.max) + '   Mín. ' + Data.degrees(w.min), 'H:' + Data.degrees(w.max) + '   L:' + Data.degrees(w.min),
-        'Máx. ' + Data.degrees(w.max) + '   Mín. ' + Data.degrees(w.min)));
+    el('div', 'range', card, highLow(w, '   '));
     el('div', 'split', card);
     var hours = el('div', 'hours', card), width = parseFloat(card.style.width) - 30 - 422, hw = width / 6;
     for (var i = 0; i < w.hours.length && i < 6; i++) {
@@ -477,8 +507,10 @@
         step: function (d) { cycle('temperature', ['auto', 'C', 'F'], unit, d); renderPanels(); }},
       {label: tr('Tema', 'Theme', 'Tema'), value: theme === 'light' ? tr('Claro', 'Light', 'Claro') : theme === 'dark' ? tr('Escuro', 'Dark', 'Oscuro') : auto,
         step: function (d) { cycle('theme', ['auto', 'light', 'dark'], theme, d); checkNight(); }},
+      {label: tr('Conteúdo do topo', 'Top of the screen', 'Contenido de arriba'), value: topName(Prefs.topContent()),
+        step: function (d) { cycle('topContent', Prefs.TOP_CONTENT, Prefs.topContent(), d); topChanged(); }},
       {label: tr('Widget do clima', 'Weather widget', 'Widget del clima'), toggle: Prefs.weather(),
-        step: function () { Prefs.set('weather', !Prefs.weather()); renderPanels(); }},
+        step: function () { Prefs.set('weather', !Prefs.weather()); renderPanels(); renderClockWeather(); }},
       {label: tr('Widget de cotações', 'Quotes widget', 'Widget de cotizaciones'), toggle: Prefs.quotes(),
         step: function () { Prefs.set('quotes', !Prefs.quotes()); Data.settingsChanged(); }}
     ];
@@ -493,6 +525,18 @@
     rows.push({label: tr('Prateleira', 'Shelf', 'Estante'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('Ajustes da TV', 'TV Settings', 'Ajustes del TV'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
     return rows;
+  }
+
+  function topName(t) {
+    return t === 'none' ? tr('Relógio', 'Clock', 'Reloj') : tr('Recomendações', 'Recommendations', 'Recomendaciones');
+  }
+
+  /** Top of the screen changed: the picks come back (and are fetched) or the clock takes their place. */
+  function topChanged() {
+    cards = [];
+    renderCards();
+    renderClock();
+    Data.refresh();
   }
 
   function cycle(name, values, current, d) {
@@ -665,7 +709,7 @@
         else if (dy > 0) { openDrawer(); return; }
         else if (dy < 0) {
           if (cards.length) { st.zone = Z.CARDS; st.card = nearest(cardNodes, centerX(tiles[st.shelf])); }
-          else { st.zone = Z.TOP; st.top = st.tab; }
+          else { st.zone = Z.TOP; st.top = firstTop(); }
         }
         break;
       case Z.CARDS:
@@ -675,7 +719,7 @@
         break;
       case Z.TOP:
         if (dx) {
-          st.top = Math.max(0, Math.min(5, st.top + dx));
+          st.top = Math.max(picksOn() ? 0 : 3, Math.min(5, st.top + dx));
           if (st.top < 3) selectTab(st.top);   // as on Apple TV: focusing a tab selects it
         } else if (dy > 0) {
           if (cards.length) { st.zone = Z.CARDS; st.card = Math.min(cards.length - 1, st.top < 3 ? 0 : cards.length - 1); }
@@ -753,7 +797,7 @@
   var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, SAVER_AFTER = 5 * 60000;
 
   function showSaver() {
-    var photos = Data.showcase().filter(function (p) { return p.backdrop && Data.appFor(p.app); });
+    var photos = (picksOn() ? Data.showcase() : []).filter(function (p) { return p.backdrop && Data.appFor(p.app); });
     saverOn = true;
     var s = $('saver');
     s.innerHTML = '';
@@ -865,6 +909,7 @@
     renderQuotes();
     renderCards();
     renderPanels();
+    renderClockWeather();
     checkNight();
   });
 
