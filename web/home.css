@@ -385,6 +385,38 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .panel .head { color: rgba(255, 255, 255, 0.7); }
 .night .panel .side { color: rgba(255, 255, 255, 0.6); }
 
+/* Now on TV (Samsung): a frame around a hole in the page, where the TV's video plane shows through. */
+#live {
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  border: 10px solid rgba(255, 255, 255, 0.86);
+  background: #0B0B0D;
+  color: #FFF;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  -webkit-transition: border-color 0.2s, box-shadow 0.28s;
+  transition: border-color 0.2s, box-shadow 0.28s;
+}
+.night #live { border-color: rgba(38, 38, 42, 0.92); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+.live-on #live:not(.dark) { background: transparent; }
+#live.dark { background: #1C1C1E; }
+#live.focus { border-color: #FFF; box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42); }
+#live .icon { position: absolute; left: 50%; top: 70px; width: 56px; height: 56px; margin-left: -28px; opacity: 0.6; }
+#live .msg { position: absolute; left: 20px; right: 20px; top: 140px; text-align: center; font-size: 25px; font-weight: 500; color: rgba(255, 255, 255, 0.7); }
+#live .stand-in { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: -webkit-linear-gradient(-45deg, #33415C, #121826); background: linear-gradient(135deg, #33415C, #121826); }
+#live .tag {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  padding: 5px 14px 6px 12px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 20px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+#live .dot { display: inline-block; width: 10px; height: 10px; margin-right: 9px; border-radius: 5px; background: #FF453A; vertical-align: 2px; }
+#live.dark .dot { background: #8E8E93; }
+
 #weather .now { position: absolute; left: 34px; top: 82px; height: 100px; white-space: nowrap; }
 #weather .now .sym { width: 56px; height: 56px; vertical-align: 12px; margin-right: 18px; }
 #weather .now .temp { font-size: 100px; font-weight: 300; line-height: 100px; font-feature-settings: 'tnum'; }

@@ -265,6 +265,41 @@ var TV = (function () {
     }
   }
 
+  // The live picture: tizen.tvwindow puts the TV's current source on a video plane under the page, so it shows where
+  // the page is transparent. Tizen 6.5 (QN90B) tested; anything missing or throwing just means no preview.
+  var canPreview = false;
+  try {
+    canPreview = samsung && !!window.tizen.tvwindow && typeof window.tizen.tvwindow.show === 'function' &&
+        typeof window.tizen.tvwindow.getSource === 'function';
+  } catch (e) {}
+  var previewShown = false;
+
+  /** What the TV is on: {id ("source:HDMI:2", as inputs() lists them), type, number, signal}, or null. */
+  function samsungCurrent() {
+    try {
+      var s = window.tizen.tvwindow.getSource();
+      if (!s || !s.type) return null;
+      return {id: 'source:' + s.type + ':' + (s.number || 1), type: s.type, number: s.number || 1, signal: s.signal !== false};
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function samsungPreview(rect, done) {
+    try {
+      window.tizen.tvwindow.show(function () { previewShown = true; if (done) done(true); }, function () { if (done) done(false); },
+          [rect.left + 'px', rect.top + 'px', rect.width + 'px', rect.height + 'px'], 'MAIN');
+    } catch (e) {
+      if (done) done(false);
+    }
+  }
+
+  function samsungHidePreview() {
+    if (!previewShown) return;
+    previewShown = false;
+    try { window.tizen.tvwindow.hide(function () {}, function () {}, 'MAIN'); } catch (e) {}
+  }
+
   // MARK: - The TV, whichever it is
 
   return {
@@ -347,6 +382,27 @@ var TV = (function () {
         }
         done(list);
       });
+    },
+
+    /** Whether this TV can show its live picture inside the page (Samsung; the browser stand-in shows a placeholder). */
+    canPreview: canPreview || (!webos && !samsung),
+
+    /** The source the TV is on ({id, type, number, signal}), or null when it doesn't tell. */
+    current: function () {
+      if (samsung) return samsungCurrent();
+      if (!webos) return {id: 'source:TV:1', type: 'TV', number: 1, signal: true};
+      return null;
+    },
+
+    /** Shows the live picture in rect ({left, top, width, height}, page pixels: the page is 1920×1080); done(ok). */
+    preview: function (rect, done) {
+      if (canPreview) { samsungPreview(rect, done); return; }
+      if (done) setTimeout(function () { done(!webos && !samsung); }, 0);
+    },
+
+    /** Takes the live picture away (no-op when it isn't shown). */
+    hidePreview: function () {
+      if (canPreview) samsungHidePreview();
     },
 
     /** The TV's own settings; done(ok). */
