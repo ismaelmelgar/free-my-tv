@@ -96,6 +96,15 @@ var TV = (function () {
       'built-in-app-info-viewer|commonsearch|searchall|preview-|tv-scheduler|csfs|notification-app|mycontents|' +
       'safLaunchBridge|shortcut|remote-workspace|voiceassistant|mybixby|weather-viewer))');
 
+  // Tizen 6 and newer (2021+ TVs) list some 230 of Samsung's own pieces as shown (CoBA components, hotel and
+  // maintenance modes, setting pages…). There only store apps are kept, whose ids are a 10-character package id and
+  // a name ("9Ur5IzDKqV.TizenYouTube"), plus the built-ins people open; not Samsung's preinstalled promo (2022ePop01).
+  // Prime Video comes built in there (org.tizen.primevideo), which SAMSUNG_HIDDEN would take out with the rest.
+  var SAMSUNG_STORE_ID = /^[A-Za-z0-9]{10}\.[A-Za-z0-9_]+$/;
+  var SAMSUNG_KEEP = /^(org\.tizen\.(browser|netflix-app|primevideo)|com\.samsung\.tv\.(knox-browser|aria-video|store|gaminghub))$/;
+  var SAMSUNG_PROMO = /^2022ePop01\./;
+  var tizenMajor = (function () { var m = /Tizen (\d+)/.exec(navigator.userAgent); return m ? +m[1] : 0; })();
+
   // Samsung apps whose iconPath is Tizen's generic pinwheel (a valid image, so onerror never fires): our own icons.
   // Seen on a 2018 NU7675 (Tizen 4); Smart Hub draws their real icons from a folder apps can't read. On a 2017
   // MU6100 (Tizen 3) no iconPath loads at all, so common apps get a logo here: Simple Icons' (CC0), cropped and tinted
@@ -103,6 +112,7 @@ var TV = (function () {
   var SAMSUNG_ICONS = {
     '9Ur5IzDKqV.TizenYouTube': 'icons/youtube.png',
     'evKhCgZelL.AmazonIgnitionLauncher2': 'icons/prime.png',
+    'org.tizen.primevideo': 'icons/prime.png',
     'RN1MCdNq8t.Netflix': 'icons/netflix.svg',
     'org.tizen.netflix-app': 'icons/netflix.svg',
     'NvZ26VG9Yw.HBOGOLAG': 'icons/max.svg',
@@ -177,7 +187,9 @@ var TV = (function () {
         var out = [];
         for (var i = 0; i < list.length; i++) {
           var a = list[i];
-          if (!a.id || a.show === false || a.id === self || SAMSUNG_HIDDEN.test(a.id)) continue;
+          var keep = tizenMajor >= 6 && SAMSUNG_KEEP.test(a.id);
+          if (!a.id || a.show === false || a.id === self || SAMSUNG_HIDDEN.test(a.id) && !keep) continue;
+          if (tizenMajor >= 6 && (!SAMSUNG_STORE_ID.test(a.id) && !keep || SAMSUNG_PROMO.test(a.id))) continue;
           var icon = a.iconPath || '';
           if (icon && icon.indexOf('://') < 0) icon = 'file://' + icon;
           if (SAMSUNG_ICONS[a.id]) icon = SAMSUNG_ICONS[a.id];
@@ -186,6 +198,10 @@ var TV = (function () {
         // The built-in Netflix stays only when the store's Netflix isn't installed.
         var store = out.some(function (x) { return /\.Netflix$/.test(x.id); });
         if (store) out = out.filter(function (x) { return x.id.indexOf('org.tizen.netflix') !== 0; });
+        // The same for Prime Video.
+        if (out.some(function (x) { return /\.AmazonIgnitionLauncher\d*$/.test(x.id); })) out = out.filter(function (x) { return x.id !== 'org.tizen.primevideo'; });
+        // Tizen 6 has two "Internet": the Knox browser is the one Smart Hub shows.
+        if (out.some(function (x) { return x.id === 'com.samsung.tv.knox-browser'; })) out = out.filter(function (x) { return x.id !== 'org.tizen.browser'; });
         // Smart Hub keeps its own order, which isn't readable: the same alphabetical order as All Apps elsewhere.
         out.sort(function (x, y) { var a = x.title.toLowerCase(), b = y.title.toLowerCase(); return a < b ? -1 : a > b ? 1 : 0; });
         done(out);
