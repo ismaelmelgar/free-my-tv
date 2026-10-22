@@ -53,8 +53,10 @@
   var stage = $('stage'), body = document.body;
 
   /** The 1920 × 1080 stage fills the window (on the TV it already is 1920 × 1080). */
+  var scale = 1;
+
   function fit() {
-    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    var s = scale = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
     stage.style.webkitTransform = stage.style.transform = s === 1 ? '' : 'scale(' + s + ')';
   }
 
@@ -133,11 +135,12 @@
 
   // MARK: - Focus
 
-  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit'};
+  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', LIVE: 'live', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit'};
   var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0};
   var cards = [];
 
   function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT; }
+  function inDrawer() { return st.zone === Z.DRAWER || st.zone === Z.LIVE; }
 
   function updateFocus() {
     var i, list;
@@ -161,7 +164,9 @@
     $('apps').lastChild.style.webkitTransform = $('apps').lastChild.style.transform = 'translateY(' + (-first * 239) + 'px)';
     focusRows($('settings'), st.row, st.zone === Z.SETTINGS);
     focusRows($('shelfedit'), st.edit, st.zone === Z.EDIT);
-    setClass(body, 'drawer-open', st.zone === Z.DRAWER);
+    if ($('live')) setClass($('live'), 'focus', st.zone === Z.LIVE);
+    setClass(body, 'drawer-open', inDrawer());
+    syncPreview();
   }
 
   function focusRows(sheet, index, on) {
@@ -356,18 +361,23 @@
     var old = d.querySelectorAll('.panel');
     for (var o = 0; o < old.length; o++) d.removeChild(old[o]);
     var wx = Prefs.weather(), coins = Data.activeCoins(), qt = coins.length > 0;
-    var split = 80 + 1760 * 0.585;
+    var start = 80;
+    if (previewOn()) {
+      renderLive(el('div', 'panel glass', d));
+      start = 80 + LIVE.width + 32;
+    }
+    var split = start + (1840 - start) * (start > 80 ? 0.5 : 0.585);
     if (wx) {
       var w = el('div', 'panel glass', d);
       w.id = 'weather';
-      w.style.left = '80px';
-      w.style.width = ((qt ? split - 16 : 1840) - 80) + 'px';
+      w.style.left = start + 'px';
+      w.style.width = ((qt ? split - 16 : 1840) - start) + 'px';
       renderWeather(w);
     }
     if (qt) {
       var q = el('div', 'panel glass', d);
       q.id = 'prices';
-      var left = wx ? split + 16 : 80;
+      var left = wx ? split + 16 : start;
       q.style.left = left + 'px';
       q.style.width = (1840 - left) + 'px';
       renderPrices(q, coins);
@@ -388,8 +398,9 @@
     el('div', 'range', card, I18N.lang === 'ru' ? 'Макс. ' + Data.degrees(w.max) + '   Мин. ' + Data.degrees(w.min) : tr('Máx. ' + Data.degrees(w.max) + '   Mín. ' + Data.degrees(w.min), 'H:' + Data.degrees(w.max) + '   L:' + Data.degrees(w.min),
         'Máx. ' + Data.degrees(w.max) + '   Mín. ' + Data.degrees(w.min)));
     el('div', 'split', card);
-    var hours = el('div', 'hours', card), width = parseFloat(card.style.width) - 30 - 422, hw = width / 6;
-    for (var i = 0; i < w.hours.length && i < 6; i++) {
+    var hours = el('div', 'hours', card), width = parseFloat(card.style.width) - 30 - 422;
+    var count = Math.max(1, Math.min(6, Math.floor(width / 84))), hw = width / count;
+    for (var i = 0; i < w.hours.length && i < count; i++) {
       var h = el('div', 'hour', hours), x = w.hours[i];
       h.style.left = (hw * i) + 'px';
       h.style.width = hw + 'px';
@@ -422,11 +433,131 @@
     var tiles = $('tiles').children;
     st.zone = Z.DRAWER;
     st.drawer = Math.min(drawerItems.length - 1, nearest(document.querySelectorAll('#drawer .key'), centerX(tiles[st.shelf])));
+    if (previewOn()) refreshLive();
     updateFocus();
+  }
+
+  // MARK: - Now on TV: the TV's live picture in the drawer (Samsung)
+
+  // The picture goes on a video plane under the page (tizen.tvwindow), so the page leaves a hole where it shows:
+  // the sky is clipped around the screen and the panel is only a frame. Shown once the drawer has finished moving,
+  // taken away as soon as anything else covers it, the app goes away or the screensaver starts.
+  // The video plane covers whatever the page draws inside its rectangle, so the label sits above it, in the glass.
+  var LIVE = {left: 80, top: 708, width: 410, height: 300, inset: 18, videoTop: 72};
+  var live = {want: false, timer: 0, source: null, failed: false, launchedAt: 0, cardClip: ''};
+
+  /** The picture's rectangle on the stage: 16:9, under the label. */
+  function liveVideo() {
+    var w = LIVE.width - 2 * LIVE.inset, h = LIVE.height - LIVE.videoTop - LIVE.inset;
+    return {x: LIVE.left + LIVE.inset, y: LIVE.top + LIVE.videoTop, w: w, h: Math.min(h, Math.round(w * 9 / 16))};
+  }
+
+  function previewOn() { return TV.canPreview && Prefs.preview(); }
+
+  // Only the antenna plays here. Showing an HDMI source in the window makes the TV switch to it full screen about a
+  // second later (QN90B with a Chromecast on HDMI-CEC), so HDMI inputs get a card that opens them instead.
+  function canShowLive(src) { return !!src && src.signal && src.type === 'TV' && !live.failed; }
+
+  function sourceName(src) {
+    if (!src) return tr('TV', 'TV', 'TV');
+    for (var i = 0; i < inputs.length; i++) {
+      if (inputs[i].id === src.id) return inputs[i].label || tr('TV aberta', 'Live TV', 'TV en vivo');
+    }
+    return src.type === 'TV' ? tr('TV aberta', 'Live TV', 'TV en vivo') : src.type + ' ' + src.number;
+  }
+
+  function renderLive(card) {
+    card.id = 'live';
+    card.style.left = LIVE.left + 'px';
+    card.style.width = LIVE.width + 'px';
+    var src = live.source, ok = canShowLive(src);
+    setClass(card, 'idle', !ok);
+    var head = el('div', 'head', card);
+    el('span', 'dot', head);
+    head.appendChild(document.createTextNode(sourceName(src)));
+    var v = liveVideo(), screen = el('div', 'screen', card);
+    screen.style.left = (v.x - LIVE.left) + 'px';
+    screen.style.top = (v.y - LIVE.top) + 'px';
+    screen.style.width = v.w + 'px';
+    screen.style.height = v.h + 'px';
+    if (!ok) {
+      sym(src && src.type === 'HDMI' ? 'hdmi' : 'live_tv', screen, 48).className += ' icon';
+      el('div', 'msg', screen, !src ? tr('Nada na TV agora', 'Nothing on TV right now', 'Nada en la TV ahora') :
+          !src.signal ? tr('Sem sinal', 'No signal', 'Sin señal') : tr('Aperte OK para assistir', 'Press OK to watch', 'Pulsa OK para ver'));
+    } else if (TV.name === 'browser') {
+      el('div', 'stand-in', screen);   // the browser preview has no TV: a stand-in where the picture goes
+    }
+    if (live.cardClip) card.style.webkitClipPath = card.style.clipPath = live.cardClip;
+    hover(card, Z.LIVE, 0);
+    if (st.zone === Z.LIVE) setClass(card, 'focus', true);
+  }
+
+  /** Reads the TV's source again (it may have changed since), and redraws the panel when it did. */
+  function refreshLive() {
+    var src = TV.current(), old = live.source;
+    live.source = src;
+    if (!old !== !src || (src && (src.id !== old.id || src.signal !== old.signal))) {
+      live.failed = false;
+      renderPanels();
+    }
+  }
+
+  function syncPreview() {
+    var want = previewOn() && inDrawer() && !saverOn && !document.hidden && canShowLive(live.source) &&
+        Date.now() - live.launchedAt > 4000;   // something was just opened: the TV is switching to it
+    if (want === live.want) return;
+    live.want = want;
+    clearTimeout(live.timer);
+    if (!want) {
+      TV.hidePreview();
+      hole(false);
+      return;
+    }
+    live.timer = setTimeout(function () {
+      var v = liveVideo(), x = v.x, y = v.y, w = v.w, h = v.h;
+      TV.preview({left: Math.round(x * scale), top: Math.round(y * scale), width: Math.round(w * scale), height: Math.round(h * scale)}, function (ok) {
+        if (!live.want) { TV.hidePreview(); return; }
+        if (ok) { hole(true, x, y, w, h); return; }
+        live.failed = true;   // the TV wouldn't: the panel says so instead
+        live.want = false;
+        renderPanels();
+      });
+    }, 600);
+  }
+
+  function hole(on, x, y, w, h) {
+    if (TV.name === 'browser') on = false;   // no video plane there: the stand-in stays visible
+    var sky = $('sky'), clip = '';
+    if (on) {
+      var r = x + w, b = y + h;
+      clip = 'polygon(evenodd, 0 0, 1920px 0, 1920px 1080px, 0 1080px, 0 0, ' + x + 'px ' + y + 'px, ' + r + 'px ' + y + 'px, ' +
+          r + 'px ' + b + 'px, ' + x + 'px ' + b + 'px, ' + x + 'px ' + y + 'px)';
+    }
+    sky.style.webkitClipPath = sky.style.clipPath = clip;
+    live.cardClip = on ? 'polygon(evenodd, 0 0, ' + LIVE.width + 'px 0, ' + LIVE.width + 'px ' +
+        LIVE.height + 'px, 0 ' + LIVE.height + 'px, 0 0, ' + (x - LIVE.left) + 'px ' + (y - LIVE.top) + 'px, ' + (x + w - LIVE.left) + 'px ' +
+        (y - LIVE.top) + 'px, ' + (x + w - LIVE.left) + 'px ' + (y + h - LIVE.top) + 'px, ' + (x - LIVE.left) + 'px ' + (y + h - LIVE.top) + 'px, ' +
+        (x - LIVE.left) + 'px ' + (y - LIVE.top) + 'px)' : '';
+    var card = $('live');   // the glass leaves the same hole, in its own coordinates
+    if (card) card.style.webkitClipPath = card.style.clipPath = live.cardClip;
+    document.documentElement.style.background = body.style.background = on ? 'transparent' : '';
+    setClass(body, 'live-on', !!on);
+  }
+
+  // While the drawer is open, a device turning on or the TV changing source shows up within a couple of seconds.
+  setInterval(function () {
+    if (previewOn() && inDrawer() && !document.hidden) { refreshLive(); syncPreview(); }
+  }, 2000);
+
+  function openLive() {
+    var src = live.source;
+    if (!src) return;
+    launcher(src.id, sourceName(src))();
   }
 
   function closeDrawer() {
     var keys = document.querySelectorAll('#drawer .key');
+    if (st.zone === Z.LIVE) st.drawer = nearest(keys, LIVE.left + LIVE.width / 2);
     st.zone = Z.SHELF;
     if (shelf.length) st.shelf = nearest($('tiles').children, centerX(keys[st.drawer]));
     updateFocus();
@@ -489,6 +620,10 @@
         rows.push({label: names[i], toggle: Prefs.quotes() && Prefs.coin(i), dim: !Prefs.quotes(),
           step: function () { if (Prefs.quotes()) { Prefs.setCoin(i, !Prefs.coin(i)); Data.settingsChanged(); } }});
       })(i);
+    }
+    if (TV.canPreview) {
+      rows.push({label: tr('Prévia da TV ao vivo', 'Live TV preview', 'Vista previa de la TV'), toggle: Prefs.preview(),
+        step: function () { Prefs.set('preview', !Prefs.preview()); if (Prefs.preview()) live.source = TV.current(); renderPanels(); }});
     }
     rows.push({label: tr('Prateleira', 'Shelf', 'Estante'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
     rows.push({label: tr('Ajustes da TV', 'TV Settings', 'Ajustes del TV'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
@@ -604,6 +739,8 @@
 
   function launcher(id, name) {
     return function () {
+      live.launchedAt = Date.now();
+      syncPreview();
       TV.launch(id, null, function (ok) {
         if (!ok) toast(tr('Não deu para abrir ', "Couldn't open ", 'No se pudo abrir ') + (name || id));
       });
@@ -638,6 +775,9 @@
         return;
       case Z.DRAWER:
         if (drawerItems[st.drawer]) drawerItems[st.drawer].run();
+        return;
+      case Z.LIVE:
+        openLive();
         return;
       case Z.APPS:
         if (others[st.grid]) launcher(others[st.grid].id, others[st.grid].title)();
@@ -685,6 +825,10 @@
       case Z.DRAWER:
         if (dx) st.drawer = Math.max(0, Math.min(drawerItems.length - 1, st.drawer + dx));
         else if (dy < 0) { closeDrawer(); return; }
+        else if (dy > 0 && $('live') && centerX(document.querySelectorAll('#drawer .key')[st.drawer]) < LIVE.left + LIVE.width + 120) st.zone = Z.LIVE;
+        break;
+      case Z.LIVE:
+        if (dy < 0) { st.zone = Z.DRAWER; st.drawer = nearest(document.querySelectorAll('#drawer .key'), LIVE.left + LIVE.width / 2); }
         break;
       case Z.APPS:
         var g = st.grid + dx + dy * 5;
@@ -708,7 +852,7 @@
   function back() {
     if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowsNow.length - 2; updateFocus(); return; }
     if (sheetOpen()) { closeSheets(); return; }
-    if (st.zone === Z.DRAWER) { closeDrawer(); return; }
+    if (inDrawer()) { closeDrawer(); return; }
     if (st.zone !== Z.SHELF && shelf.length) { st.zone = Z.SHELF; updateFocus(); return; }
     TV.back();
   }
@@ -717,9 +861,10 @@
   function hover(node, zone, index) {
     node.onmouseover = function () {
       if (saverOn || (sheetOpen() !== (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT))) return;
-      if (zone === Z.DRAWER && st.zone !== Z.DRAWER) return;
-      if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
-      if (zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
+      var drawerish = zone === Z.DRAWER || zone === Z.LIVE;
+      if (drawerish && !inDrawer()) return;
+      if (!drawerish && inDrawer() && zone !== Z.SHELF) return;
+      if (zone === Z.SHELF && inDrawer()) closeDrawer();
       st.zone = zone;
       if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
       else if (zone === Z.CARDS) st.card = index;
@@ -755,6 +900,7 @@
   function showSaver() {
     var photos = Data.showcase().filter(function (p) { return p.backdrop && Data.appFor(p.app); });
     saverOn = true;
+    syncPreview();
     var s = $('saver');
     s.innerHTML = '';
     var a = el('div', 'photo', s), b = el('div', 'photo', s);
@@ -800,6 +946,7 @@
     saverOn = false;
     clearTimeout(saverTimer);
     setClass($('saver'), 'on', false);
+    syncPreview();
   }
 
   function poke() {
@@ -879,8 +1026,9 @@
   document.addEventListener('webOSRelaunch', reopened);   // LG: opened again while running
   window.addEventListener('appcontrol', reopened);        // Samsung: the same
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { hideSaver(); return; }
+    if (document.hidden) { hideSaver(); syncPreview(); return; }
     idleAt = Date.now();
+    if (previewOn()) refreshLive();   // the source may have changed meanwhile
     loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
   });
 

@@ -385,6 +385,30 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .panel .head { color: rgba(255, 255, 255, 0.7); }
 .night .panel .side { color: rgba(255, 255, 255, 0.6); }
 
+/* Now on TV (Samsung): a glass panel with a label and, under it, a hole in the page where the TV's video plane shows. */
+#live .head .dot { display: inline-block; width: 12px; height: 12px; margin-right: 10px; border-radius: 6px; background: #FF3B30; vertical-align: 2px; }
+#live.idle .head .dot { background: #8E8E93; }
+#live .screen { position: absolute; border-radius: 6px; background: #0B0B0D; color: #FFF; overflow: hidden; }
+.live-on #live:not(.idle) .screen { background: transparent; }
+#live .icon { position: absolute; left: 50%; top: 52px; width: 48px; height: 48px; margin-left: -24px; opacity: 0.6; }
+#live .msg { position: absolute; left: 16px; right: 16px; top: 116px; text-align: center; font-size: 23px; font-weight: 500; color: rgba(255, 255, 255, 0.7); }
+#live .stand-in { position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: -webkit-linear-gradient(-45deg, #33415C, #121826); background: linear-gradient(135deg, #33415C, #121826); }
+/* Focus: a ring that fades in (only opacity animates). */
+#live::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  border: 4px solid #FFF;
+  border-radius: 30px;
+  opacity: 0;
+  -webkit-transition: opacity 0.2s;
+  transition: opacity 0.2s;
+}
+#live.focus::after { opacity: 1; }
+
 #weather .now { position: absolute; left: 34px; top: 82px; height: 100px; white-space: nowrap; }
 #weather .now .sym { width: 56px; height: 56px; vertical-align: 12px; margin-right: 18px; }
 #weather .now .temp { font-size: 100px; font-weight: 300; line-height: 100px; font-feature-settings: 'tnum'; }
