@@ -264,22 +264,26 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .night .card .name { color: #F5F5F7; }
 .night .card .meta { color: rgba(245, 245, 247, 0.62); }
 
-/* Without a TMDB key (or picks yet): the date and the time instead of the cards. */
-#clock {
-  position: absolute;
-  left: 76px;
-  top: 300px;
-  font-size: 176px;
-  font-weight: 200;
-  letter-spacing: -0.01em;
-  line-height: 1;
-  color: #1D1D1F;
-  display: none;
-}
-#clock .date { display: block; font-size: 40px; font-weight: 500; letter-spacing: 0; margin-top: 18px; color: #6E6E73; }
-.no-picks #clock { display: block; }
-.night #clock { color: #F5F5F7; }
-.night #clock .date { color: rgba(245, 245, 247, 0.62); }
+/*
+ * The clock instead of the picks (HomeView's clock): Home Settings > Top of the screen > Clock, no TMDB key, or no picks
+ * yet. The date, the time and the weather at Android's baselines (330, 540, 626); with the clock on top, the title, the
+ * tabs and the cards go, and the prices move under the weather (694).
+ */
+#clock { position: absolute; left: 0; top: 0; display: none; }
+#clock .date, #clock .time, #clock .wx { position: absolute; left: 77px; line-height: 1; white-space: nowrap; }
+#clock .date { top: 301px; font-size: 34px; font-weight: 600; color: #6E6E73; }
+#clock .time { top: 367px; left: 70px; font-size: 200px; font-weight: 300; letter-spacing: -0.01em; color: #1D1D1F; font-feature-settings: 'tnum'; }
+#clock .wx { top: 597px; font-size: 34px; font-weight: 500; color: #6E6E73; }
+#clock .wx .sym { width: 40px; height: 40px; vertical-align: -7px; margin-right: 16px; }
+.no-picks #clock, .top-clock #clock { display: block; }
+.top-clock #title, .top-clock #tabs, .top-clock #cards { display: none; }
+.top-clock #quotes { right: auto !important; left: 80px; top: 670px; font-size: 28px; line-height: 32px; color: #6E6E73; }
+.top-clock #quotes .q { margin: 0 32px 0 0; }
+.top-clock #quotes svg { width: 20px; height: 20px; vertical-align: -2px; margin-right: 8px; fill: #6E6E73; }
+.top-clock #quotes.hide { opacity: 1; }
+.night #clock .time { color: #F5F5F7; }
+.night #clock .date, .night #clock .wx, .night.top-clock #quotes { color: rgba(245, 245, 247, 0.62); }
+.night.top-clock #quotes svg { fill: rgba(245, 245, 247, 0.62); }
 
 /* MARK: - Shelf: the glass bar with the apps, each in its brand color; focused, a tile grows 20% and rises. */
 
