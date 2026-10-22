@@ -468,7 +468,7 @@
   // MARK: - Home Settings
 
   function settingRows() {
-    var lang = Prefs.language(), unit = Prefs.temperature(), theme = Prefs.theme();
+    var lang = Prefs.language(), unit = Prefs.temperature(), theme = Prefs.theme(), saver = savers();
     var auto = tr('Automático', 'Automatic', 'Automático'), on = tr('Ligado', 'On', 'Activado'), off = tr('Desligado', 'Off', 'Desactivado');
     var rows = [
       {label: tr('Idioma', 'Language', 'Idioma'), value: lang === 'ru' ? 'Русский' : lang === 'de' ? 'Deutsch' : lang === 'pt' ? 'Português' : lang === 'en' ? 'English' : lang === 'es' ? 'Español' : auto,
@@ -477,6 +477,8 @@
         step: function (d) { cycle('temperature', ['auto', 'C', 'F'], unit, d); renderPanels(); }},
       {label: tr('Tema', 'Theme', 'Tema'), value: theme === 'light' ? tr('Claro', 'Light', 'Claro') : theme === 'dark' ? tr('Escuro', 'Dark', 'Oscuro') : auto,
         step: function (d) { cycle('theme', ['auto', 'light', 'dark'], theme, d); checkNight(); }},
+      {label: tr('Tela de Descanso', 'Screensaver', 'Protector de pantalla'), value: saverName(saver),
+        step: function (d) { cycle('screensaver', SAVERS, saver, d); }},
       {label: tr('Widget do clima', 'Weather widget', 'Widget del clima'), toggle: Prefs.weather(),
         step: function () { Prefs.set('weather', !Prefs.weather()); renderPanels(); }},
       {label: tr('Widget de cotações', 'Quotes widget', 'Widget de cotizaciones'), toggle: Prefs.quotes(),
@@ -752,17 +754,66 @@
 
   var saverOn = false, idleAt = Date.now(), saverIndex = 0, saverTimer = 0, SAVER_AFTER = 5 * 60000;
 
+  /** Home Settings > Screensaver: the picks' photos or a gradient, as on Android (DreamView.GRADIENTS, same colors). */
+  var SAVERS = ['photos', 'sunset', 'ocean', 'forest', 'twilight', 'ember', 'graphite'];
+  // Each gradient: the glow at the bottom, the middle and the top (deep, so the white clock reads).
+  var SAVER_GRADIENTS = {
+    sunset: [0xFF9A62, 0xC2457A, 0x2E1745],
+    ocean: [0x4FD1E8, 0x2263B8, 0x0A1A3D],
+    forest: [0x8EE0A8, 0x1F7A62, 0x0A2622],
+    twilight: [0xC8A6FF, 0x5B4BC4, 0x120F33],
+    ember: [0xFFB347, 0xC0392B, 0x2A0B0E],
+    graphite: [0xA7AEBB, 0x3C414B, 0x0D0E11]
+  };
+
+  function savers() {
+    var v = Prefs.screensaver();
+    return SAVER_GRADIENTS[v] ? v : 'photos';
+  }
+
+  function saverName(id) {
+    switch (id) {
+      case 'sunset': return tr('Pôr do sol', 'Sunset', 'Atardecer');
+      case 'ocean': return tr('Oceano', 'Ocean', 'Océano');
+      case 'forest': return tr('Floresta', 'Forest', 'Bosque');
+      case 'twilight': return tr('Crepúsculo', 'Twilight', 'Crepúsculo');
+      case 'ember': return tr('Brasa', 'Ember', 'Brasa');
+      case 'graphite': return tr('Grafite', 'Graphite', 'Grafito');
+      default: return tr('Fotos', 'Photos', 'Fotos');
+    }
+  }
+
+  /**
+   * The gradient as CSS, painted on a layer 10% larger than the screen (2112 × 1188, like Android's): deep at the top,
+   * a glow rising from the bottom left and a fainter one at the right; 35% darker at night.
+   */
+  function gradientCss(c, dim) {
+    function rgba(v, a) {
+      var k = 1 - dim;
+      return 'rgba(' + Math.round((v >> 16 & 255) * k) + ',' + Math.round((v >> 8 & 255) * k) + ',' + Math.round((v & 255) * k) + ',' + a + ')';
+    }
+    var W = 2112, H = 1188;
+    function glow(x, y, rx, ry, stops) { return 'radial-gradient(' + rx + 'px ' + ry + 'px at ' + x + 'px ' + y + 'px, ' + stops + ')'; }
+    return glow(W * 0.12, H, W * 0.62, H * 0.75, rgba(c[0], 1) + ' 0%, ' + rgba(c[0], 0.55) + ' 45%, ' + rgba(c[0], 0) + ' 100%') + ', ' +
+      glow(W * 0.88, H * 0.92, W * 0.45, H * 0.55, rgba(c[0], 0.5) + ' 0%, ' + rgba(c[0], 0) + ' 100%') + ', ' +
+      'linear-gradient(' + rgba(c[2], 1) + ', ' + rgba(c[1], 1) + ')';
+  }
+
   function showSaver() {
-    var photos = Data.showcase().filter(function (p) { return p.backdrop && Data.appFor(p.app); });
+    var colors = SAVER_GRADIENTS[savers()];
+    var photos = colors ? [] : Data.showcase().filter(function (p) { return p.backdrop && Data.appFor(p.app); });
     saverOn = true;
+    clearTimeout(saverTimer);
     var s = $('saver');
     s.innerHTML = '';
+    // The gradient drifts slowly (transform only: a CSS animation the TV's compositor runs).
+    if (colors) el('div', 'gradient', s).style.background = gradientCss(colors, Data.isNight(Date.now()) ? 0.35 : 0);
     var a = el('div', 'photo', s), b = el('div', 'photo', s);
-    el('div', 'shade', s);
+    el('div', colors ? 'shade soft' : 'shade', s);   // lighter over a gradient: it keeps its glow
     var clock = el('div', 'clock', s);
     el('div', 'time', clock);
     el('div', 'date', clock);
-    el('div', 'title', clock);
+    el('div', 'title', clock).style.display = colors ? 'none' : '';
     var front = a;
     function next() {
       if (!saverOn) return;
@@ -800,6 +851,11 @@
     saverOn = false;
     clearTimeout(saverTimer);
     setClass($('saver'), 'on', false);
+    // Once faded out, the drifting gradient goes (an animation keeps running on a hidden layer).
+    saverTimer = setTimeout(function () {
+      var g = $('saver').querySelector('.gradient');
+      if (!saverOn && g) g.parentNode.removeChild(g);
+    }, 1300);
   }
 
   function poke() {

@@ -53,6 +53,7 @@ def read_config(path):
         'language': values.get('language', 'auto') or 'auto',
         'currency': values.get('currency', 'USD') or 'USD',
         'temperature': values.get('temperature', 'auto') or 'auto',
+        'screensaver': values.get('screensaver', 'photos') or 'photos',
         'showCrypto': values.get('show_crypto', 'true').lower() != 'false',
         'hideAnimation': values.get('hide_animation', 'false').lower() == 'true',
     }

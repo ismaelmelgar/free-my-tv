@@ -96,6 +96,14 @@ final class Prefs {
 
     static void setTheme(String v) { put("theme", v); }
 
+    /** "photos" (the picks' photos) or a gradient (DreamView.SAVERS). */
+    static String screensaver() {
+        String v = sp().getString("screensaver", Config.SCREENSAVER).trim().toLowerCase(Locale.ROOT);
+        return DreamView.gradient(v) != null ? v : "photos";
+    }
+
+    static void setScreensaver(String v) { put("screensaver", v); }
+
     // MARK: - City
 
     static String city() { return sp().getString("city", Config.CITY).trim(); }
