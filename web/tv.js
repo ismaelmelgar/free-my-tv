@@ -341,7 +341,7 @@ var TV = (function () {
               if (d.appId !== list[i].id) continue;
               list[i].connected = d.connected !== false;
               // A name the person gave the input on the TV ("PS5"), if any.
-              if (d.label && !/^hdmi\s*\d$/i.test(d.label)) list[i].label = d.label;
+              if (d.label && !/^hdmi\s*\d$/i.test(d.label)) { list[i].label = d.label; list[i].named = true; }
             }
           }
         }
