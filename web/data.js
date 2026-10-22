@@ -47,7 +47,7 @@ var Prefs = (function () {
     temperature: function () { return pick('temperature', CONFIG.temperature || 'auto'); },
     theme: function () { return pick('theme', 'auto'); },
     weather: function () { return pick('weather', true); },
-    preview: function () { return pick('preview', true); },   // Samsung: the TV's live picture in the drawer
+    preview: function () { return pick('preview', false); },   // Samsung: the TV's live picture (with its sound) in the drawer
     quotes: function () { return pick('quotes', CONFIG.showCrypto !== false); },
     coin: function (i) { var c = pick('coins', null); return c ? c[i] !== false : true; },
     shelf: function () { return pick('shelf', null); },

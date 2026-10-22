@@ -212,8 +212,9 @@ HDMI (Chromecast with Google TV, Google TV Streamer, onn 4K, NVIDIA Shield). Set
   app ids, which shows their names without icons); on Samsung, `tizen.application` (`getAppsInfo`,
   `launch`), the `VIDEOSOURCE` property and `tizen.tvwindow.setSource` for the inputs, then Samsung's viewer
   (`org.tizen.tv-viewer`) to show them. The drawer's *Now on TV* panel is `tizen.tvwindow.show`: the TV's picture
-  goes on a video plane under the page, so the page clips a hole in the sky there, and hides it whenever the drawer
-  closes, the app goes away or the screensaver starts (Home Settings turns it off). Samsung's own data is unreliable: on Tizen 3 no app's `iconPath` loads (on
+  goes on a video plane that covers the page inside its rectangle (labels go outside it), the page clips a hole there,
+  and hides it whenever the drawer closes, the app goes away or the screensaver starts. It plays the antenna only:
+  showing an HDMI source there makes the TV switch to it full screen. Off by default (the TV's sound plays along). Samsung's own data is unreliable: on Tizen 3 no app's `iconPath` loads (on
   Tizen 4 and 5, YouTube's and Prime Video's are a placeholder), so logos are bundled in `web/icons/` and keyed by app
   id in `SAMSUNG_ICONS` (SVGs need a width and height for old WebKit); some names are empty or long
   (`SAMSUNG_TITLES`); and Tizen 3 answers no "settings" app control, so TV Settings opens `org.tizen.menu`.

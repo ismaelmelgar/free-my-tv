@@ -363,7 +363,7 @@
     var wx = Prefs.weather(), coins = Data.activeCoins(), qt = coins.length > 0;
     var start = 80;
     if (previewOn()) {
-      renderLive(el('div', 'panel', d));
+      renderLive(el('div', 'panel glass', d));
       start = 80 + LIVE.width + 32;
     }
     var split = start + (1840 - start) * (start > 80 ? 0.5 : 0.585);
@@ -442,34 +442,52 @@
   // The picture goes on a video plane under the page (tizen.tvwindow), so the page leaves a hole where it shows:
   // the sky is clipped around the screen and the panel is only a frame. Shown once the drawer has finished moving,
   // taken away as soon as anything else covers it, the app goes away or the screensaver starts.
-  var LIVE = {left: 80, top: 708, width: 518, height: 300, frame: 10};
-  var live = {want: false, timer: 0, source: null, failed: false};
+  // The video plane covers whatever the page draws inside its rectangle, so the label sits above it, in the glass.
+  var LIVE = {left: 80, top: 708, width: 410, height: 300, inset: 18, videoTop: 72};
+  var live = {want: false, timer: 0, source: null, failed: false, launchedAt: 0, cardClip: ''};
+
+  /** The picture's rectangle on the stage: 16:9, under the label. */
+  function liveVideo() {
+    var w = LIVE.width - 2 * LIVE.inset, h = LIVE.height - LIVE.videoTop - LIVE.inset;
+    return {x: LIVE.left + LIVE.inset, y: LIVE.top + LIVE.videoTop, w: w, h: Math.min(h, Math.round(w * 9 / 16))};
+  }
 
   function previewOn() { return TV.canPreview && Prefs.preview(); }
+
+  // Only the antenna plays here. Showing an HDMI source in the window makes the TV switch to it full screen about a
+  // second later (QN90B with a Chromecast on HDMI-CEC), so HDMI inputs get a card that opens them instead.
+  function canShowLive(src) { return !!src && src.signal && src.type === 'TV' && !live.failed; }
 
   function sourceName(src) {
     if (!src) return tr('TV', 'TV', 'TV');
     for (var i = 0; i < inputs.length; i++) {
       if (inputs[i].id === src.id) return inputs[i].label || tr('TV aberta', 'Live TV', 'TV en vivo');
     }
-    return src.type === 'TV' ? tr('TV aberta', 'Live TV', 'TV en vivo') : src.type + (src.number > 1 ? ' ' + src.number : '');
+    return src.type === 'TV' ? tr('TV aberta', 'Live TV', 'TV en vivo') : src.type + ' ' + src.number;
   }
 
   function renderLive(card) {
     card.id = 'live';
     card.style.left = LIVE.left + 'px';
     card.style.width = LIVE.width + 'px';
-    var src = live.source, ok = src && src.signal && !live.failed;
-    setClass(card, 'dark', !ok);
+    var src = live.source, ok = canShowLive(src);
+    setClass(card, 'idle', !ok);
+    var head = el('div', 'head', card);
+    el('span', 'dot', head);
+    head.appendChild(document.createTextNode(sourceName(src)));
+    var v = liveVideo(), screen = el('div', 'screen', card);
+    screen.style.left = (v.x - LIVE.left) + 'px';
+    screen.style.top = (v.y - LIVE.top) + 'px';
+    screen.style.width = v.w + 'px';
+    screen.style.height = v.h + 'px';
     if (!ok) {
-      sym(src && src.type === 'HDMI' ? 'hdmi' : 'live_tv', el('div', 'icon', card));
-      el('div', 'msg', card, src ? tr('Sem sinal', 'No signal', 'Sin señal') : tr('Nada na TV agora', 'Nothing on TV right now', 'Nada en la TV ahora'));
+      sym(src && src.type === 'HDMI' ? 'hdmi' : 'live_tv', screen, 48).className += ' icon';
+      el('div', 'msg', screen, !src ? tr('Nada na TV agora', 'Nothing on TV right now', 'Nada en la TV ahora') :
+          !src.signal ? tr('Sem sinal', 'No signal', 'Sin señal') : tr('Aperte OK para assistir', 'Press OK to watch', 'Pulsa OK para ver'));
     } else if (TV.name === 'browser') {
-      el('div', 'stand-in', card);   // the browser preview has no TV: a stand-in where the picture goes
+      el('div', 'stand-in', screen);   // the browser preview has no TV: a stand-in where the picture goes
     }
-    var tag = el('div', 'tag', card);
-    el('span', 'dot', tag);
-    tag.appendChild(document.createTextNode(sourceName(src)));
+    if (live.cardClip) card.style.webkitClipPath = card.style.clipPath = live.cardClip;
     hover(card, Z.LIVE, 0);
     if (st.zone === Z.LIVE) setClass(card, 'focus', true);
   }
@@ -485,7 +503,8 @@
   }
 
   function syncPreview() {
-    var want = previewOn() && inDrawer() && !saverOn && !document.hidden && !!live.source && live.source.signal && !live.failed;
+    var want = previewOn() && inDrawer() && !saverOn && !document.hidden && canShowLive(live.source) &&
+        Date.now() - live.launchedAt > 4000;   // something was just opened: the TV is switching to it
     if (want === live.want) return;
     live.want = want;
     clearTimeout(live.timer);
@@ -495,7 +514,7 @@
       return;
     }
     live.timer = setTimeout(function () {
-      var f = LIVE.frame, x = LIVE.left + f, y = LIVE.top + f, w = LIVE.width - 2 * f, h = LIVE.height - 2 * f;
+      var v = liveVideo(), x = v.x, y = v.y, w = v.w, h = v.h;
       TV.preview({left: Math.round(x * scale), top: Math.round(y * scale), width: Math.round(w * scale), height: Math.round(h * scale)}, function (ok) {
         if (!live.want) { TV.hidePreview(); return; }
         if (ok) { hole(true, x, y, w, h); return; }
@@ -507,6 +526,7 @@
   }
 
   function hole(on, x, y, w, h) {
+    if (TV.name === 'browser') on = false;   // no video plane there: the stand-in stays visible
     var sky = $('sky'), clip = '';
     if (on) {
       var r = x + w, b = y + h;
@@ -514,6 +534,12 @@
           r + 'px ' + b + 'px, ' + x + 'px ' + b + 'px, ' + x + 'px ' + y + 'px)';
     }
     sky.style.webkitClipPath = sky.style.clipPath = clip;
+    live.cardClip = on ? 'polygon(evenodd, 0 0, ' + LIVE.width + 'px 0, ' + LIVE.width + 'px ' +
+        LIVE.height + 'px, 0 ' + LIVE.height + 'px, 0 0, ' + (x - LIVE.left) + 'px ' + (y - LIVE.top) + 'px, ' + (x + w - LIVE.left) + 'px ' +
+        (y - LIVE.top) + 'px, ' + (x + w - LIVE.left) + 'px ' + (y + h - LIVE.top) + 'px, ' + (x - LIVE.left) + 'px ' + (y + h - LIVE.top) + 'px, ' +
+        (x - LIVE.left) + 'px ' + (y - LIVE.top) + 'px)' : '';
+    var card = $('live');   // the glass leaves the same hole, in its own coordinates
+    if (card) card.style.webkitClipPath = card.style.clipPath = live.cardClip;
     document.documentElement.style.background = body.style.background = on ? 'transparent' : '';
     setClass(body, 'live-on', !!on);
   }
@@ -526,7 +552,6 @@
   function openLive() {
     var src = live.source;
     if (!src) return;
-    TV.hidePreview();
     launcher(src.id, sourceName(src))();
   }
 
@@ -714,7 +739,8 @@
 
   function launcher(id, name) {
     return function () {
-      TV.hidePreview();
+      live.launchedAt = Date.now();
+      syncPreview();
       TV.launch(id, null, function (ok) {
         if (!ok) toast(tr('Não deu para abrir ', "Couldn't open ", 'No se pudo abrir ') + (name || id));
       });
