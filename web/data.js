@@ -50,6 +50,14 @@ var Prefs = (function () {
     quotes: function () { return pick('quotes', CONFIG.showCrypto !== false); },
     coin: function (i) { var c = pick('coins', null); return c ? c[i] !== false : true; },
     shelf: function () { return pick('shelf', null); },
+    /** What the person set for an input ("hdmi1"): {name, kind}, or {} (the TV's own name and icon). */
+    input: function (key) { var all = pick('inputs', null); return (all && all[key]) || {}; },
+    setInput: function (key, look) {
+      var all = {}, old = pick('inputs', null) || {};
+      for (var k in old) if (old.hasOwnProperty(k) && k !== key) all[k] = old[k];
+      if (look.name || look.kind) all[key] = look;
+      this.set('inputs', all);
+    },
     set: function (name, value) { v[name] = value; save(); this.version++; },
     setCoin: function (i, on) {
       var c = (pick('coins', null) || [true, true, true, true]).slice();

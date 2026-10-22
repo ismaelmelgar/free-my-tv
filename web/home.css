@@ -448,7 +448,7 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .cell.focus .face { -webkit-transform: scale(1.08); transform: scale(1.08); box-shadow: 0 16px 34px rgba(0, 0, 0, 0.55), inset 0 0 0 2px rgba(255, 255, 255, 0.4); }
 .cell.focus .label { color: #FFF; }
 
-#settings .box, #shelfedit .box {
+#settings .box, #shelfedit .box, #inputedit .box {
   position: absolute;
   left: 560px;
   top: 150px;
@@ -469,6 +469,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .box .row .value { position: absolute; right: 24px; top: 0; color: rgba(255, 255, 255, 0.92); font-weight: 500; }
 .box .row .value .chev { color: rgba(255, 255, 255, 0.35); margin: 0 10px; }
 .box .row.dim { color: rgba(255, 255, 255, 0.4); }
+.box .row .value .sym { width: 30px; height: 30px; vertical-align: -5px; margin-right: 12px; }
+.box .row .value .name { width: 360px; height: 50px; margin-top: 10px; padding: 0 16px; box-sizing: border-box; border: 0; border-radius: 14px; outline: none; background: rgba(255, 255, 255, 0.14); color: #FFF; font: inherit; vertical-align: top; }
 .box .hint { padding: 14px 18px 0; font-size: 22px; font-weight: 500; color: rgba(255, 255, 255, 0.5); }
 .toggle { position: absolute; right: 24px; top: 13px; width: 78px; height: 44px; border-radius: 22px; background: #3A3D45; -webkit-transition: background-color 0.2s; transition: background-color 0.2s; }
 .toggle::after { content: ''; position: absolute; left: 4px; top: 4px; width: 36px; height: 36px; border-radius: 18px; background: #FFF; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); -webkit-transition: -webkit-transform 0.2s; transition: transform 0.2s; }

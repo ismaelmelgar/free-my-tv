@@ -133,11 +133,12 @@
 
   // MARK: - Focus
 
-  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit'};
-  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0};
+  var Z = {TOP: 'top', CARDS: 'cards', SHELF: 'shelf', DRAWER: 'drawer', APPS: 'apps', SETTINGS: 'settings', EDIT: 'edit', INPUTS: 'inputs'};
+  var st = {zone: Z.SHELF, top: 0, tab: 0, card: 0, shelf: 0, drawer: 0, grid: 0, row: 0, edit: 0, input: 0};
   var cards = [];
 
-  function sheetOpen() { return st.zone === Z.APPS || st.zone === Z.SETTINGS || st.zone === Z.EDIT; }
+  function isSheet(zone) { return zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT || zone === Z.INPUTS; }
+  function sheetOpen() { return isSheet(st.zone); }
 
   function updateFocus() {
     var i, list;
@@ -161,6 +162,7 @@
     $('apps').lastChild.style.webkitTransform = $('apps').lastChild.style.transform = 'translateY(' + (-first * 239) + 'px)';
     focusRows($('settings'), st.row, st.zone === Z.SETTINGS);
     focusRows($('shelfedit'), st.edit, st.zone === Z.EDIT);
+    focusRows($('inputedit'), st.input, st.zone === Z.INPUTS);
     setClass(body, 'drawer-open', st.zone === Z.DRAWER);
   }
 
@@ -323,8 +325,8 @@
     d.innerHTML = '';
     drawerItems = [];
     for (var i = 0; i < inputs.length; i++) {
-      var x = inputs[i];
-      drawerItems.push({label: x.label || tr('TV aberta', 'Live TV', 'TV en vivo'), symbol: x.symbol, off: !x.connected, run: launcher(x.id, x.label)});
+      var x = inputs[i], look = inputLook(x);
+      drawerItems.push({label: look.label, symbol: look.symbol, off: !x.connected, run: launcher(x.id, look.label)});
     }
     drawerInputs = drawerItems.length;
     drawerItems.push({label: tr('Todos os Apps', 'All Apps', 'Todas las apps'), symbol: 'apps', run: openApps});
@@ -461,6 +463,7 @@
     setClass($('apps'), 'open', false);
     setClass($('settings'), 'open', false);
     setClass($('shelfedit'), 'open', false);
+    setClass($('inputedit'), 'open', false);
     st.zone = Z.SHELF;
     updateFocus();
   }
@@ -490,9 +493,15 @@
           step: function () { if (Prefs.quotes()) { Prefs.setCoin(i, !Prefs.coin(i)); Data.settingsChanged(); } }});
       })(i);
     }
-    rows.push({label: tr('Prateleira', 'Shelf', 'Estante'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
+    rows.push({id: 'shelf', label: tr('Prateleira', 'Shelf', 'Estante'), value: '›', step: function (d) { if (d >= 0) openShelfEdit(); }});
+    if (hdmiInputs().length) rows.push({id: 'inputs', label: tr('Entradas', 'Inputs', 'Entradas'), value: '›', step: function (d) { if (d >= 0) openInputEdit(); }});
     rows.push({label: tr('Ajustes da TV', 'TV Settings', 'Ajustes del TV'), value: '›', step: function (d) { if (d >= 0) tvSettings(); }});
     return rows;
+  }
+
+  function rowIndex(id) {
+    for (var i = 0; i < rowsNow.length; i++) if (rowsNow[i].id === id) return i;
+    return 0;
   }
 
   function cycle(name, values, current, d) {
@@ -600,6 +609,128 @@
     renderShelfEdit();
   }
 
+  // MARK: - Inputs editor: a name and an icon for what's on each HDMI port, like the TV's own "Edit name"
+
+  /** The devices to pick from: [kind, symbol, name]. The first is "as the TV says" (today's name and icon). */
+  function inputKinds() {
+    return [
+      ['', null, null],
+      ['console', 'gamepad', tr('Videogame', 'Game console', 'Consola')],
+      ['streamer', 'cast', tr('Streaming', 'Streamer', 'Streaming')],
+      ['pc', 'computer', tr('PC', 'PC', 'PC')],
+      ['bluray', 'disc', 'Blu-ray'],
+      ['settop', 'set_top_box', tr('TV por assinatura', 'Cable box', 'Decodificador')],
+      ['soundbar', 'speaker', tr('Soundbar', 'Soundbar', 'Barra de sonido')]
+    ];
+  }
+
+  function kindIndex(kinds, kind) {
+    for (var i = 1; i < kinds.length; i++) if (kinds[i][0] === kind) return i;
+    return 0;
+  }
+
+  /** An input as shown: a name typed here, else the name set on the TV (LG), else the device's, else the port's. */
+  function inputLook(x) {
+    var mine = x.key === 'live' ? {} : Prefs.input(x.key), kinds = inputKinds(), kind = kinds[kindIndex(kinds, mine.kind)];
+    return {
+      label: mine.name || (x.named ? x.label : kind[2] || x.label) || tr('TV aberta', 'Live TV', 'TV en vivo'),
+      symbol: kind[1] || x.symbol
+    };
+  }
+
+  function hdmiInputs() {
+    return inputs.filter(function (x) { return x.key !== 'live'; });
+  }
+
+  var naming = null;   // {field, key} while a name is typed
+
+  function renderInputEdit() {
+    var box = $('inputedit').firstChild, list = hdmiInputs();
+    box.innerHTML = '';
+    var title = el('div', 'title', box);
+    sym('hdmi', title);
+    title.appendChild(document.createTextNode(tr('Entradas', 'Inputs', 'Entradas')));
+    var holder = el('div', 'rows', el('div', 'list', box));
+    for (var i = 0; i < list.length; i++) {
+      var look = inputLook(list[i]), row = el('div', 'row', holder, 'HDMI ' + list[i].key.replace(/\D/g, '')), v = el('span', 'value', row);
+      chevron(v, '‹', i, -1);
+      sym(look.symbol, v);
+      v.appendChild(document.createTextNode(look.label));
+      chevron(v, '›', i, 1);
+      hover(row, Z.INPUTS, i);
+    }
+    el('div', 'hint', box, tr('← → escolhem o aparelho · OK dá um nome', '← → pick the device · OK names it', '← → eligen el aparato · OK le pone nombre'));
+    updateFocus();
+  }
+
+  /** The arrows beside the device also pick it with the pointer. */
+  function chevron(parent, text, i, dx) {
+    el('span', 'chev', parent, text).onclick = function (e) {
+      e.stopPropagation();
+      st.input = i;
+      stepKind(dx);
+    };
+  }
+
+  function openInputEdit() {
+    setClass($('settings'), 'open', false);
+    st.zone = Z.INPUTS;
+    st.input = 0;
+    renderInputEdit();
+    setClass($('inputedit'), 'open', true);
+    updateFocus();
+  }
+
+  function stepKind(dx) {
+    var x = hdmiInputs()[st.input];
+    if (!x) return;
+    var mine = Prefs.input(x.key), kinds = inputKinds();
+    var i = (kindIndex(kinds, mine.kind) + dx + kinds.length) % kinds.length;
+    Prefs.setInput(x.key, {name: mine.name || '', kind: kinds[i][0]});
+    renderDrawer();
+    renderInputEdit();
+  }
+
+  /** OK on an input: a text field in its row, which brings up the TV's keyboard. An empty name goes back to the default. */
+  function startNaming() {
+    var x = hdmiInputs()[st.input], row = $('inputedit').querySelectorAll('.row')[st.input];
+    if (!x || !row || naming) return;
+    var v = row.querySelector('.value'), mine = Prefs.input(x.key), f = document.createElement('input');
+    v.innerHTML = '';
+    f.type = 'text';
+    f.className = 'name';
+    f.maxLength = 24;
+    f.value = mine.name || '';
+    var kinds = inputKinds(), kind = kinds[kindIndex(kinds, mine.kind)];
+    f.placeholder = x.named ? x.label : kind[2] || x.label;   // the name it keeps when left empty
+    v.appendChild(f);
+    naming = {field: f, key: x.key};
+    $('inputedit').querySelector('.hint').textContent = tr('OK salva · Voltar cancela', 'OK saves · Back cancels', 'OK guarda · Atrás cancela');
+    f.onkeydown = function (e) {
+      var k = e.keyCode;
+      if (k === 13 || k === 65376) finishNaming(true);                         // OK, or the keyboard's Done (Samsung)
+      else if (k === 65385 || k === TV.keys.back || k === 27) finishNaming(false);   // the keyboard's Cancel, or Back
+      else { e.stopPropagation(); return; }                                   // letters and the caret stay in the field
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    f.onblur = function () { finishNaming(true); };   // the keyboard closed some other way
+    f.focus();
+  }
+
+  function finishNaming(keep) {
+    if (!naming) return;
+    var n = naming;
+    naming = null;
+    n.field.onblur = null;
+    if (keep) {
+      Prefs.setInput(n.key, {name: n.field.value.replace(/^\s+|\s+$/g, ''), kind: Prefs.input(n.key).kind || ''});
+      renderDrawer();
+    }
+    n.field.blur();
+    renderInputEdit();
+  }
+
   // MARK: - Opening things
 
   function launcher(id, name) {
@@ -647,6 +778,9 @@
         return;
       case Z.EDIT:
         editShelf(0);
+        return;
+      case Z.INPUTS:
+        startNaming();
         return;
     }
   }
@@ -701,12 +835,17 @@
         if (dy) st.edit = Math.max(0, Math.min(apps.length - 1, st.edit + dy));
         else if (dx) editShelf(dx);
         break;
+      case Z.INPUTS:
+        if (dy) st.input = Math.max(0, Math.min(hdmiInputs().length - 1, st.input + dy));
+        else if (dx) stepKind(dx);
+        break;
     }
     updateFocus();
   }
 
   function back() {
-    if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowsNow.length - 2; updateFocus(); return; }
+    if (st.zone === Z.EDIT) { setClass($('shelfedit'), 'open', false); openSettings(); st.row = rowIndex('shelf'); updateFocus(); return; }
+    if (st.zone === Z.INPUTS) { setClass($('inputedit'), 'open', false); openSettings(); st.row = rowIndex('inputs'); updateFocus(); return; }
     if (sheetOpen()) { closeSheets(); return; }
     if (st.zone === Z.DRAWER) { closeDrawer(); return; }
     if (st.zone !== Z.SHELF && shelf.length) { st.zone = Z.SHELF; updateFocus(); return; }
@@ -716,7 +855,7 @@
   /** The pointer focuses what it's over (the Magic Remote, or a mouse when previewing). */
   function hover(node, zone, index) {
     node.onmouseover = function () {
-      if (saverOn || (sheetOpen() !== (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT))) return;
+      if (saverOn || naming || sheetOpen() !== isSheet(zone)) return;
       if (zone === Z.DRAWER && st.zone !== Z.DRAWER) return;
       if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
       if (zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
@@ -728,9 +867,10 @@
       else if (zone === Z.APPS) st.grid = index;
       else if (zone === Z.SETTINGS) st.row = index;
       else if (zone === Z.EDIT) st.edit = index;
+      else if (zone === Z.INPUTS) st.input = index;
       updateFocus();
     };
-    node.onclick = function () { node.onmouseover(); activate(); };
+    node.onclick = function () { if (naming) return; node.onmouseover(); activate(); };
   }
 
   // MARK: - Toast
