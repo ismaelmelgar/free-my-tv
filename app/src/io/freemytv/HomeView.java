@@ -159,6 +159,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
         TILE_STYLE.put("disney", new int[] {0xFF173584, 0xFF08143F, 0});
         TILE_STYLE.put("max", new int[] {0xFF5C30E8, 0xFF221684, 0});
         TILE_STYLE.put("appletv", new int[] {0xFF1C1C1E, 0xFF000000, 0});
+        TILE_STYLE.put("live", new int[] {0xFF14A99D, 0xFF06625E, 0});   // Live TV (HomeApps.LIVE)
     }
     private final android.graphics.PorterDuffColorFilter whiteLogo =
             new android.graphics.PorterDuffColorFilter(0xFFFFFFFF, android.graphics.PorterDuff.Mode.SRC_IN);
@@ -2202,7 +2203,7 @@ final class HomeView extends ViewGroup implements Choreographer.FrameCallback, H
     private boolean canReorder() {
         if (sheetOpen || zone != Z_SHELF || shelfIndex >= shelf.size() || shelf.size() < 2) return false;
         HomeApps.Item it = shelf.get(shelfIndex);
-        return it.kind == HomeApps.APP && it.pkg != null;
+        return (it.kind == HomeApps.APP || it.kind == HomeApps.LIVE_TV) && it.pkg != null;
     }
 
     private void startReorder() {

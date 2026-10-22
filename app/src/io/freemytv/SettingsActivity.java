@@ -816,7 +816,10 @@ public class SettingsActivity extends Activity {
             // Only the apps the shelf shows: one that was uninstalled would hold a place (and count toward the limit)
             // without a row to take it off.
             PackageManager pm = getContext().getPackageManager();
-            for (String pkg : HomeApps.shelfPackages(getContext())) if (HomeApps.launchIntent(pm, pkg) != null) shelfOrder.add(pkg);
+            boolean live = HomeApps.liveTv(getContext()) != null;
+            for (String pkg : HomeApps.shelfPackages(getContext())) {
+                if (HomeApps.LIVE.equals(pkg) ? live : HomeApps.launchIntent(pm, pkg) != null) shelfOrder.add(pkg);
+            }
             rebuildShelfRows(HomeApps.shelfCandidates(getContext()));
             pickScroll = 0;
             focus = 0;

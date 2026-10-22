@@ -339,6 +339,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
   -webkit-transition: opacity 0.25s;
   transition: opacity 0.25s;
 }
+/* Live TV (TV.LIVE): the symbol over its name, sized by the tile (both kinds of tile are 16:9). */
+.tile .glyph, .cell .face .glyph { position: absolute; left: 50%; top: 15%; width: 23.6%; height: 42%; margin-left: -11.8%; color: #FFF; }
+.tile .name, .cell .face .name { position: absolute; left: 6%; right: 6%; top: 62%; text-align: center; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #FFF; }
+.tile .name { font-size: 21px; line-height: 28px; }
+.cell .face .name { font-size: 28px; line-height: 36px; }
 .tile.focus { -webkit-transform: scale(1.2); transform: scale(1.2); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34); z-index: 2; }
 .tile.focus::after { opacity: 1; }
 .night .tile { box-shadow: 0 4px 22px rgba(0, 0, 0, 0.3); }

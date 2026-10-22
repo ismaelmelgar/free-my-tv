@@ -95,6 +95,8 @@ final class HomeApps {
         {"spotify", "Spotify", "com.spotify.tv.android", "1DB954", "", "1"},
     };
     static final int MAX_SHELF = 8;
+    /** Live TV as an app in the shelf's list: Settings > Shelf and holding OK move it or take it off like any app. */
+    static final String LIVE = "freemytv:live";
     /** Live TV apps of some brands (the antenna's channels open through the standard Android request first). */
     static final String[] LIVE_TV_APPS = {"com.tcl.tv", "com.google.android.tv", "com.mediatek.wwtv.tvcenter", "com.sony.dtv.tvx",
             "com.smartdevice.livetv", "com.mediatek.tv.oneworld.tvcenter"};
@@ -128,6 +130,10 @@ final class HomeApps {
         PackageManager pm = c.getPackageManager();
         for (String pkg : shelfPackages(c)) {
             if (items.size() >= MAX_SHELF) break;
+            if (pkg.equals(LIVE)) {
+                if (liveTv(c) != null) items.add(liveCard(c));
+                continue;
+            }
             Intent launch = launchIntent(pm, pkg);
             if (launch == null) continue;
             ResolveInfo ri = pm.resolveActivity(launch, 0);
@@ -175,6 +181,7 @@ final class HomeApps {
         List<String[]> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (String[] d : SHELF) if (launchIntent(pm, d[2]) != null && seen.add(d[2])) out.add(new String[] {d[2], d[1]});
+        if (liveTv(c) != null) out.add(new String[] {LIVE, Ui.tr("Live TV")});
         List<String[]> more = new ArrayList<>();
         for (String[] app : launchable(c)) {
             if (app[0].equals(c.getPackageName()) || HIDDEN.contains(app[0]) || !seen.add(app[0])) continue;
@@ -194,6 +201,40 @@ final class HomeApps {
         items.addAll(inputs(c));
         items.add(shortcut(ALL_APPS, "all", Ui.tr("All Apps"), "apps"));
         return items;
+    }
+
+    /** Live TV on the shelf: the TV symbol over its name, white, on its own color (drawn like an app's logo). */
+    private static Item liveCard(Context c) {
+        Item it = shortcut(LIVE_TV, "live", Ui.tr("Live TV"), "live_tv");
+        it.pkg = LIVE;
+        it.logo = liveLogo(c, it.label);
+        it.logoInk = ink(it.logo);
+        return it;
+    }
+
+    /** Made once per language (the name is part of the image). */
+    private static Bitmap liveLogo(Context c, String label) {
+        String key = "live@" + label;
+        synchronized (LOGOS) {
+            if (LOGOS.containsKey(key)) return LOGOS.get(key);
+        }
+        final float symbol = 160, gap = 26;
+        Paint text = Ui.text(Ui.displaySemibold, 56, 0xFFFFFFFF);
+        text.setTextAlign(Paint.Align.CENTER);
+        Bitmap s = Symbols.get(c, "live_tv");
+        float sw = Symbols.width(c, "live_tv", symbol), sh = s == null ? 0 : sw * s.getHeight() / s.getWidth();
+        float cap = Ui.cap(text), tw = text.measureText(label);
+        int w = (int) Math.ceil(Math.max(sw, tw)) + 8, h = (int) Math.ceil(sh + gap + cap + text.descent()) + 8;
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(b);
+        Symbols.draw(c, canvas, "live_tv", w / 2f, 4 + sh / 2, symbol, 0xFFFFFFFF);
+        canvas.drawText(label, w / 2f, 4 + sh + gap + cap, text);
+        Bitmap logo = trimLogo(b);
+        logo.setHasMipMap(true);
+        synchronized (LOGOS) {
+            LOGOS.put(key, logo);
+        }
+        return logo;
     }
 
     private static Item shortcut(int kind, String key, String label, String symbol) {
@@ -352,6 +393,8 @@ final class HomeApps {
             it.tile = appTile(c, null, pkg, 0);
             items.add(it);
         }
+        // Live TV is listed like an app while it isn't on the shelf.
+        if (!onShelf.contains(LIVE) && liveTv(c) != null) items.add(special(c, LIVE_TV, "live", Ui.tr("Live TV"), "live_tv"));
         Collections.sort(items, (a, b) -> a.label.toLowerCase(Locale.ROOT).compareTo(b.label.toLowerCase(Locale.ROOT)));
         synchronized (HomeApps.class) {
             TILES.keySet().removeIf(k -> k.contains(".") && !seen.contains(k));
