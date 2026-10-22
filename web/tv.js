@@ -267,8 +267,13 @@ var TV = (function () {
 
   // MARK: - The TV, whichever it is
 
+  // Live TV as an app (the same id as on Android): the shelf can hold it and All Apps lists it.
+  var LIVE = 'freemytv:live';
+
   return {
     name: webos ? 'webos' : samsung ? 'tizen' : 'browser',
+
+    LIVE: LIVE,
 
     /** Installed apps, as the TV's launcher lists them: [{id, title, icon, color}]. */
     apps: function (done) {
@@ -307,6 +312,7 @@ var TV = (function () {
 
     /** Opens an app (or an input); done(ok). */
     launch: function (id, params, done) {
+      if (id === LIVE) id = samsung ? 'source:TV:1' : INPUTS[0].id;
       if (samsung) {
         if (id.indexOf('source:') === 0) samsungSource(id, done);
         else samsungLaunch(id, done);
