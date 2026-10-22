@@ -403,6 +403,12 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
         });
     }
 
+    /** The gradient for a Home Settings choice at w × h (darker at night): the preview in Settings. */
+    static Bitmap gradientBitmap(String saver, boolean night, int w, int h) {
+        int[] colors = gradient(saver);
+        return colors == null ? null : paintGradient(colors, night ? NIGHT_DIM : 0, w, h);
+    }
+
     /** A vertical gradient (deep at the top) with a soft glow rising from the bottom left and a fainter one at the right. */
     private static Bitmap paintGradient(int[] colors, float dim, int w, int h) {
         int glow = darker(colors[0], dim), mid = darker(colors[1], dim), deep = darker(colors[2], dim);
@@ -578,7 +584,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
      * background): each frame draws only the photo (the TV's GPU feels every full-screen layer). With the slow zoom,
      * they move a little along with the photo, which makes no difference to the text.
      */
-    private static Bitmap withScrims(Bitmap photo, float lightCaption, float lightClock) {
+    static Bitmap withScrims(Bitmap photo, float lightCaption, float lightClock) {
         int w = photo.getWidth(), h = photo.getHeight();
         Canvas c = new Canvas(photo);
         Paint p = new Paint(Paint.DITHER_FLAG);

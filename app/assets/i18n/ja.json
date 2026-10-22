@@ -76,6 +76,7 @@
  "OK adds or removes (up to {n}). ← → change the order.": "OKで追加・削除（最大{n}個）。← → で順番を変更。",
  "OK or the arrows change the value.": "OKまたは矢印で値を変更します。",
  "OK picks, Back cancels.": "OKで選択、戻るでキャンセル。",
+ "OK shows it full screen": "OKで全画面表示",
  "Ocean": "オーシャン",
  "Off": "オフ",
  "On": "オン",

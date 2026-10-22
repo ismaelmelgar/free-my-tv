@@ -76,6 +76,7 @@
  "OK adds or removes (up to {n}). ← → change the order.": "OK로 추가 또는 제거(최대 {n}개). ← →로 순서 변경.",
  "OK or the arrows change the value.": "OK 또는 화살표로 값을 바꿉니다.",
  "OK picks, Back cancels.": "OK로 선택, 뒤로로 취소.",
+ "OK shows it full screen": "OK를 누르면 전체 화면으로 보기",
  "Ocean": "바다",
  "Off": "끔",
  "On": "켬",

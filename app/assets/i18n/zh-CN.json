@@ -76,6 +76,7 @@
  "OK adds or removes (up to {n}). ← → change the order.": "按 OK 添加或移除（最多 {n} 个）。← → 调整顺序。",
  "OK or the arrows change the value.": "按 OK 或方向键更改数值。",
  "OK picks, Back cancels.": "OK 选择，返回取消。",
+ "OK shows it full screen": "按 OK 全屏显示",
  "Ocean": "海洋",
  "Off": "关",
  "On": "开",
