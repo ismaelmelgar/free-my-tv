@@ -203,9 +203,9 @@ final class HomeApps {
         return items;
     }
 
-    /** Live TV on the shelf: the TV symbol over its name, white, on its own color (drawn like an app's logo). */
+    /** Live TV on the shelf: the TV symbol over its name, white, on blue (drawn like an app's logo). */
     private static Item liveCard(Context c) {
-        Item it = shortcut(LIVE_TV, "live", Ui.tr("Live TV"), "live_tv");
+        Item it = shortcut(LIVE_TV, "live", Ui.tr("Live TV"), "tv");   // the drawer's Live TV symbol
         it.pkg = LIVE;
         it.logo = liveLogo(c, it.label);
         it.logoInk = ink(it.logo);
@@ -221,13 +221,13 @@ final class HomeApps {
         final float symbol = 160, gap = 26;
         Paint text = Ui.text(Ui.displaySemibold, 56, 0xFFFFFFFF);
         text.setTextAlign(Paint.Align.CENTER);
-        Bitmap s = Symbols.get(c, "live_tv");
-        float sw = Symbols.width(c, "live_tv", symbol), sh = s == null ? 0 : sw * s.getHeight() / s.getWidth();
+        Bitmap s = Symbols.get(c, "tv");
+        float sw = Symbols.width(c, "tv", symbol), sh = s == null ? 0 : sw * s.getHeight() / s.getWidth();
         float cap = Ui.cap(text), tw = text.measureText(label);
         int w = (int) Math.ceil(Math.max(sw, tw)) + 8, h = (int) Math.ceil(sh + gap + cap + text.descent()) + 8;
         Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(b);
-        Symbols.draw(c, canvas, "live_tv", w / 2f, 4 + sh / 2, symbol, 0xFFFFFFFF);
+        Symbols.draw(c, canvas, "tv", w / 2f, 4 + sh / 2, symbol, 0xFFFFFFFF);
         canvas.drawText(label, w / 2f, 4 + sh + gap + cap, text);
         Bitmap logo = trimLogo(b);
         logo.setHasMipMap(true);
@@ -394,7 +394,7 @@ final class HomeApps {
             items.add(it);
         }
         // Live TV is listed like an app while it isn't on the shelf.
-        if (!onShelf.contains(LIVE) && liveTv(c) != null) items.add(special(c, LIVE_TV, "live", Ui.tr("Live TV"), "live_tv"));
+        if (!onShelf.contains(LIVE) && liveTv(c) != null) items.add(special(c, LIVE_TV, "live", Ui.tr("Live TV"), "tv"));
         Collections.sort(items, (a, b) -> a.label.toLowerCase(Locale.ROOT).compareTo(b.label.toLowerCase(Locale.ROOT)));
         synchronized (HomeApps.class) {
             TILES.keySet().removeIf(k -> k.contains(".") && !seen.contains(k));

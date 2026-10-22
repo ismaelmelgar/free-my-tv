@@ -98,10 +98,10 @@
   function face(app, box, wordSize) {
     if (app.id === TV.LIVE) {
       // Live TV: the TV symbol over its name, white on its own color (Android's HomeApps.liveCard).
-      box.style.background = '-webkit-linear-gradient(top, #14A99D, #06625E)';
-      box.style.background = 'linear-gradient(#14A99D, #06625E)';
-      sym('live_tv', box).className += ' glyph';
-      el('div', 'name', box, app.title);
+      box.style.background = '-webkit-linear-gradient(top, #3478F6, #1A3FA8)';
+      box.style.background = 'linear-gradient(#3478F6, #1A3FA8)';
+      sym('live_tv', box).className += ' app-sym';   // the drawer's Live TV symbol
+      el('div', 'app-name', box, app.title);
       return;
     }
     var k = shelfKey(app);
@@ -120,7 +120,7 @@
   }
 
   var apps = [], shelf = [], others = [], inputs = [];
-  var live = {id: TV.LIVE, title: '', icon: '', color: ''};   // Live TV as an app, while the TV has it
+  var liveApp = {id: TV.LIVE, title: '', icon: '', color: ''};   // Live TV as an app, while the TV has it
 
   function pickShelf() {
     var chosen = Prefs.shelf(), out = [];
@@ -134,7 +134,7 @@
           if ((SHELF[s][1].test(apps[a].id) || SHELF[s][2].test(apps[a].title)) && out.indexOf(apps[a]) < 0) { out.push(apps[a]); break; }
         }
       }
-      if (!out.length) out = apps.filter(function (x) { return x !== live; }).slice(0, MAX_SHELF);
+      if (!out.length) out = apps.filter(function (x) { return x !== liveApp; }).slice(0, MAX_SHELF);
     }
     shelf = out;
     others = apps.filter(function (x) { return shelf.indexOf(x) < 0; });
@@ -836,7 +836,7 @@
   // MARK: - Start
 
   function renderAll() {
-    live.title = tr('TV aberta', 'Live TV', 'TV en vivo');   // the language may have changed
+    liveApp.title = tr('TV aberta', 'Live TV', 'TV en vivo');   // the language may have changed
     renderTop();
     renderQuotes();
     cards = [];
@@ -857,10 +857,10 @@
         apps = list.slice();
         if (liveTV()) {
           // Where the TV's own list would have it: by name on Samsung (sorted), first on LG (as LG's launcher does).
-          live.title = tr('TV aberta', 'Live TV', 'TV en vivo');
-          var at = 0, name = live.title.toLowerCase();
+          liveApp.title = tr('TV aberta', 'Live TV', 'TV en vivo');
+          var at = 0, name = liveApp.title.toLowerCase();
           if (TV.name === 'tizen') while (at < apps.length && apps[at].title.toLowerCase() < name) at++;
-          apps.splice(at, 0, live);
+          apps.splice(at, 0, liveApp);
         }
         pickShelf();
         if (done) done();
