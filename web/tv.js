@@ -203,13 +203,18 @@ var TV = (function () {
     }
   }
 
-  /** The video sources the TV reports ([{type: 'TV' | 'HDMI' | ..., number}]), or null when it doesn't tell. */
+  /**
+   * The video sources the TV reports ([{type: 'TV' | 'HDMI' | ..., number}]): the ones with a device on, and all of
+   * them (with the disconnected ones). Both null when it doesn't tell.
+   */
   function samsungSources(done) {
     try {
-      window.tizen.systeminfo.getPropertyValue('VIDEOSOURCE', function (v) { done(v && v.connected ? v.connected : null); },
-          function () { done(null); });
+      window.tizen.systeminfo.getPropertyValue('VIDEOSOURCE', function (v) {
+        var on = v && v.connected ? v.connected : null;
+        done(on, on && v.disconnected ? on.concat(v.disconnected) : on);
+      }, function () { done(null, null); });
     } catch (e) {
-      done(null);
+      done(null, null);
     }
   }
 
@@ -225,10 +230,15 @@ var TV = (function () {
         if (done) done(true);
       });
     }
-    samsungSources(function (sources) {
+    samsungSources(function (sources, all) {
       var source = null;
       for (var i = 0; sources && i < sources.length; i++) {
         if (sources[i].type === type && sources[i].number === number) source = sources[i];
+      }
+      // Nothing on (a Chromecast asleep, a console off): the TV lists the port as disconnected, but it still switches to
+      // it, and shows the device once it wakes.
+      for (var j = 0; !source && all && j < all.length; j++) {
+        if (all[j].type === type && all[j].number === number) source = all[j];
       }
       if (!source) { show(type === 'TV'); return; }   // the antenna: the viewer alone brings it up
       try {
