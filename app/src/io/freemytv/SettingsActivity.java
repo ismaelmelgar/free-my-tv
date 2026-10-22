@@ -7,11 +7,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.Bitmap;
+import android.graphics.BitmapShader;
 import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -36,6 +40,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Free My TV's settings (the app's icon, "All Apps", or the gear on the home screen), in the style of Apple TV's
@@ -144,6 +150,20 @@ public class SettingsActivity extends Activity {
         private long startedAt, lastNanos, pendingAt, lastSky;
         private int w, h;
         private float k = 1;
+        // The screensaver preview on the left while the Screensaver row of Home Settings is focused: the picked
+        // style drifting in a card, with a small clock, as the screensaver shows it.
+        private static final float CARD_W = 720, CARD_H = 405, CARD_TOP = 200;
+        private final ExecutorService previewWorker = Executors.newSingleThreadExecutor();
+        private final Matrix previewMatrix = new Matrix();
+        private final Paint previewPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final Paint previewFill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private Bitmap previewImage;
+        private BitmapShader previewShader;
+        private String previewFor = "", previewTime = "", previewDate = "";
+        private int previewGen;
+        private long previewAt, previewMinute = -1;
+        private float previewShown;     // 0 (the logo) to 1 (the preview), eased
+        private Paint previewClock, previewDay, previewName;
         private Paint title, subtitle, version, rowLabel, rowValue, rowSub, header, cellLabel, cellValue, warn, spinner, white, shadow;
         private TextPaint notice;
 
@@ -253,8 +273,8 @@ public class SettingsActivity extends Activity {
                 top = LIST_TOP + 20 + row * (CHOICE_H + ROW_GAP);
                 height = CHOICE_H;
             } else {
-                top = LIST_TOP + 20 + row * (LIST_ROW_H + LIST_ROW_GAP);
-                height = LIST_ROW_H;
+                top = LIST_TOP + 20 + row * listPitch(rowCount());
+                height = listPitch(rowCount()) - LIST_ROW_GAP;
             }
             focusBox.set(LIST_X * k, top * k, LIST_R * k, (top + height) * k);
             return focusBox;
@@ -280,7 +300,13 @@ public class SettingsActivity extends Activity {
             if (!running) return;
             boolean moving = busy();
             for (Spring s : pop) moving |= !s.settled();
-            if (moving || SystemClock.uptimeMillis() - lastSky >= 100) invalidate();
+            float want = previewWanted() ? 1 : 0;
+            moving |= Math.abs(previewShown - want) > 0.004f;
+            long up = SystemClock.uptimeMillis();
+            // The preview's image fading in; its drift is slow enough (under a fifth of a pixel per frame) to move with
+            // the sky, 10 frames a second, at no extra cost.
+            moving |= previewShown > 0.004f && up - previewAt < 400;
+            if (moving || up - lastSky >= 100) invalidate();
             Choreographer.getInstance().postFrameCallback(this);
         }
 
@@ -314,6 +340,15 @@ public class SettingsActivity extends Activity {
             white.setColor(0xFFF5F5F7);
             shadow = new Paint(Paint.ANTI_ALIAS_FLAG);
             shadow.setMaskFilter(new BlurMaskFilter(22 * k, BlurMaskFilter.Blur.NORMAL));
+            previewClock = Ui.numbers(Ui.displaySemibold, 84 * k, 0xF2FFFFFF);
+            previewClock.setTextAlign(Paint.Align.RIGHT);
+            previewDay = Ui.numbers(Ui.semibold, 17 * k, 0xEBFFFFFF);
+            previewDay.setTextAlign(Paint.Align.RIGHT);
+            for (Paint p : new Paint[] {previewClock, previewDay}) p.setShadowLayer(10 * k, 0, 1 * k, 0x66000000);
+            previewName = Ui.text(Ui.displaySemibold, 40 * k, 0xFFFFFFFF);
+            previewName.setTextAlign(Paint.Align.CENTER);
+            previewFill.setColor(0xFF15171C);
+            previewFor = "";   // made again at the new size
         }
 
         private boolean busy() {
@@ -328,6 +363,11 @@ public class SettingsActivity extends Activity {
 
         private boolean freeActive() {
             return HomeMode.FREE.equals(state.optString("mode")) && !state.optBoolean("homeReverted");
+        }
+
+        /** Row to row in the lists: a little tighter when Home Settings has more rows than fit (with the Dollar). */
+        private static float listPitch(int rows) {
+            return Math.min(LIST_ROW_H + LIST_ROW_GAP, 814f / Math.max(1, rows));
         }
 
         private int rowCount() {
@@ -358,12 +398,22 @@ public class SettingsActivity extends Activity {
             }
             scene.drawBackground(c);
 
-            // On the left: big symbol, title, description.
-            float cx = 500 * k;
-            Symbols.draw(getContext(), c, "sparkles", cx, 400 * k, 150 * k, 0xEBFFFFFF);
-            c.drawText("Free My TV", cx, 612 * k, title);
-            c.drawText(Ui.tr("Your TV's home screen and screensaver"), cx, 660 * k, subtitle);
-            c.drawText(versionName(getContext()), cx, 704 * k, version);
+            // On the left: big symbol, title, description; or the screensaver preview, crossfading.
+            float target = previewWanted() ? 1 : 0;
+            previewShown += (target - previewShown) * Math.min(1, dt * 9);
+            if (Math.abs(target - previewShown) < 0.004f) previewShown = target;
+            float logo = 1 - previewShown;
+            if (logo > 0.004f) {
+                float cx = 500 * k;
+                Symbols.draw(getContext(), c, "sparkles", cx, 400 * k, 150 * k, Ui.alpha(0xEBFFFFFF, logo));
+                title.setAlpha(Math.round(255 * logo));
+                subtitle.setAlpha(Math.round(0x99 * logo));
+                version.setAlpha(Math.round(0x66 * logo));
+                c.drawText("Free My TV", cx, 612 * k, title);
+                c.drawText(Ui.tr("Your TV's home screen and screensaver"), cx, 660 * k, subtitle);
+                c.drawText(versionName(getContext()), cx, 704 * k, version);
+            }
+            if (previewShown > 0.004f) drawPreview(c, up, previewShown);
 
             if (screen == MAIN) drawMain(c, seconds); else if (screen == HOME_CHOICE) drawChoice(c); else if (screen == PICKER) drawPicker(c); else if (screen == SHELF_EDIT) drawShelfEditor(c); else drawList(c);
         }
@@ -622,11 +672,114 @@ public class SettingsActivity extends Activity {
             }
         }
 
+        // MARK: - Screensaver preview
+
+        private static final int SAVER_ROW = 3;
+
+        private boolean previewWanted() {
+            return screen == HOME_SETTINGS && focus == SAVER_ROW;
+        }
+
+        /** Makes the card's image for the picked style in the background (a gradient, or a picks' photo). */
+        private void loadPreview() {
+            final String saver = Prefs.screensaver();
+            final boolean night = HomeData.get(getContext()).isNight(System.currentTimeMillis());
+            String key = saver + (night ? "/night" : "/day");
+            if (key.equals(previewFor) || w == 0) return;
+            previewFor = key;
+            final int gen = ++previewGen;
+            final int pw = Math.round(CARD_W * 1.1f * k), ph = Math.round(CARD_H * 1.1f * k);
+            java.io.File photo = null;
+            if (DreamView.gradient(saver) == null) {
+                Recs recs = Recs.get(getContext());
+                for (Recs.Pick p : recs.showcase()) {
+                    photo = recs.readyImage(p);
+                    if (photo != null) break;
+                }
+            }
+            final java.io.File file = photo;
+            previewWorker.execute(() -> {
+                Bitmap b = null;
+                try {
+                    if (file != null) {
+                        float[] light = new float[2];
+                        Bitmap[] both = Backdrop.photo(file, pw, ph, light);
+                        both[1].recycle();
+                        b = DreamView.withScrims(both[0], light[0], light[1]);   // as the screensaver darkens it
+                    } else {
+                        b = DreamView.gradientBitmap(saver, night, pw, ph);   // null for photos without any yet
+                    }
+                } catch (Exception | OutOfMemoryError e) {
+                    AppLog.w("settings: screensaver preview: " + e.getMessage());
+                }
+                final Bitmap ready = b;
+                handler.post(() -> {
+                    if (gen != previewGen) {
+                        if (ready != null) ready.recycle();
+                        return;
+                    }
+                    final Bitmap old = previewImage;
+                    previewImage = ready;
+                    previewShader = ready == null ? null : new BitmapShader(ready, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP);
+                    previewPaint.setShader(previewShader);
+                    previewAt = SystemClock.uptimeMillis();
+                    if (old != null) handler.postDelayed(old::recycle, 500);   // after the last frame that drew it
+                    invalidate();
+                });
+            });
+        }
+
+        /**
+         * The card: the image drifting like the screensaver's (zoom and pan, rounded by its shader rather than a clip,
+         * which the GPUs of Android 8 to 11 choke on), the date and the clock at its top right, the name under it.
+         */
+        private void drawPreview(Canvas c, long up, float alpha) {
+            loadPreview();
+            long now = System.currentTimeMillis();
+            if (now / 60_000 != previewMinute) {
+                previewMinute = now / 60_000;
+                previewTime = Ui.clock(now);
+                previewDate = Ui.date(now);
+            }
+            float cw = CARD_W * k, ch = CARD_H * k, left = 500 * k - cw / 2, top = CARD_TOP * k, r = 30 * k;
+            tmp.set(left, top + 16 * k, left + cw, top + 16 * k + ch);
+            shadow.setColor(Ui.alpha(0xFF000000, 0.45f * alpha));
+            c.drawRoundRect(tmp, r, r, shadow);
+            tmp.offset(0, -16 * k);
+            previewFill.setAlpha(Math.round(255 * alpha));
+            c.drawRoundRect(tmp, r, r, previewFill);
+            Bitmap img = previewImage;
+            if (img != null && previewShader != null) {
+                double t = (up - previewAt) / 1000.0;
+                float z = 1 + 0.1f * (0.5f + 0.5f * (float) Math.sin(t * (2 * Math.PI / 97)));
+                float gx = cw * (z - 1) / 2, gy = ch * (z - 1) / 2;
+                float s = cw / img.getWidth() * z * 1.1f;
+                // The image is 10% larger than the card: at z = 1 it shows its middle 1/1.1.
+                float ox = -cw * 0.05f - gx * (1 + 0.85f * (float) Math.sin(t * (2 * Math.PI / 131)));
+                float oy = -ch * 0.05f - gy * (1 + 0.85f * (float) Math.cos(t * (2 * Math.PI / 113)));
+                previewMatrix.setScale(s, s);
+                previewMatrix.postTranslate(left + ox, top + oy);
+                previewShader.setLocalMatrix(previewMatrix);
+                previewPaint.setAlpha(Math.round(255 * alpha * Ui.clamp((up - previewAt) / 400f)));
+                c.drawRoundRect(tmp, r, r, previewPaint);
+            }
+            float right = tmp.right - 26 * k;
+            previewDay.setAlpha(Math.round(0xEB * alpha));
+            previewClock.setAlpha(Math.round(0xF2 * alpha));
+            float dateBase = top + 44 * k;
+            c.drawText(previewDate, right, dateBase, previewDay);
+            c.drawText(previewTime, right, dateBase + 14 * k + Ui.cap(previewClock), previewClock);
+            previewName.setAlpha(Math.round(255 * alpha));
+            c.drawText(DreamView.saverName(Prefs.screensaver()), 500 * k, top + ch + 74 * k, previewName);
+            subtitle.setAlpha(Math.round(0x99 * alpha));
+            c.drawText(Ui.tr("OK shows it full screen"), 500 * k, top + ch + 120 * k, subtitle);
+        }
+
         // MARK: - Home Settings and Remote Buttons
 
         private static final String[] UNITS = {"auto", "C", "F"}, THEMES = {"auto", "light", "dark"};
-        /** Home Settings: language, temperature, theme, sounds, weather, city, quotes, then one row per coin. */
-        private static final int CITY_ROW = 5, COIN_ROWS = 7;
+        /** Home Settings: language, temperature, theme, screensaver, sounds, weather, city, quotes, then one row per coin. */
+        private static final int CITY_ROW = 6, COIN_ROWS = 8;
 
         private boolean dollar() {
             return "BRL".equalsIgnoreCase(Config.CURRENCY.trim());
@@ -637,6 +790,7 @@ public class SettingsActivity extends Activity {
             l.add(Ui.tr("Language"));
             l.add(Ui.tr("Temperature"));
             l.add(Ui.tr("Theme"));
+            l.add(Ui.tr("Screensaver"));
             l.add(Ui.tr("Navigation sounds"));
             l.add(Ui.tr("Weather widget"));
             l.add(Ui.tr("City"));
@@ -657,10 +811,11 @@ public class SettingsActivity extends Activity {
             v[1] = unit.equals("C") ? "°C" : unit.equals("F") ? "°F" : Ui.tr("unit|Automatic");
             String theme = Prefs.theme();
             v[2] = theme.equals("light") ? Ui.tr("Light") : theme.equals("dark") ? Ui.tr("Dark") : Ui.tr("Automatic");
-            v[3] = onOff(Prefs.sounds());
-            v[4] = onOff(Prefs.weather());
+            v[3] = DreamView.saverName(Prefs.screensaver());
+            v[4] = onOff(Prefs.sounds());
+            v[5] = onOff(Prefs.weather());
             v[CITY_ROW] = !cityStatus.isEmpty() ? cityStatus : Prefs.city().isEmpty() ? "—" : Prefs.city();
-            v[6] = onOff(Prefs.quotes());
+            v[7] = onOff(Prefs.quotes());
             // No quotes widget, nowhere to show prices: the coins read as off (and stay locked) until it is back on.
             for (int i = COIN_ROWS; i < v.length; i++) v[i] = onOff(Prefs.quotes() && Prefs.coin(i - COIN_ROWS));
             return v;
@@ -738,10 +893,16 @@ public class SettingsActivity extends Activity {
                     Prefs.setTheme(THEMES[(at + dir + THEMES.length) % THEMES.length]);
                     break;
                 }
-                case 3: Prefs.setSounds(!Prefs.sounds()); break;
-                case 4: Prefs.setWeather(!Prefs.weather()); break;
+                case SAVER_ROW: {
+                    String[] all = DreamView.SAVERS;
+                    int at = java.util.Arrays.asList(all).indexOf(Prefs.screensaver());
+                    Prefs.setScreensaver(all[(at + dir + all.length) % all.length]);
+                    return;
+                }
+                case 4: Prefs.setSounds(!Prefs.sounds()); break;
+                case 5: Prefs.setWeather(!Prefs.weather()); break;
                 case CITY_ROW: return;
-                case 6: Prefs.setQuotes(!Prefs.quotes()); break;
+                case 7: Prefs.setQuotes(!Prefs.quotes()); break;
                 default:
                     if (!Prefs.quotes()) return;
                     Prefs.setCoin(focus - COIN_ROWS, !Prefs.coin(focus - COIN_ROWS));
@@ -942,9 +1103,10 @@ public class SettingsActivity extends Activity {
             Paint heading = Ui.text(Ui.displaySemibold, 34 * k, 0xFFFFFFFF);
             c.drawText(keys ? Ui.tr("Remote Buttons") : Ui.tr("Home Settings"),
                     LIST_X * k + 30 * k, (LIST_TOP - 24) * k, heading);
+            float pitch = listPitch(labels.length);
             for (int i = 0; i < labels.length; i++) {
-                float y = (LIST_TOP + 20 + i * (LIST_ROW_H + LIST_ROW_GAP)) * k;
-                rowRect.set(LIST_X * k, y, LIST_R * k, y + LIST_ROW_H * k);
+                float y = (LIST_TOP + 20 + i * pitch) * k;
+                rowRect.set(LIST_X * k, y, LIST_R * k, y + (pitch - LIST_ROW_GAP) * k);
                 float f = drawRowBackground(c, i);
                 rowLabel.setColor(blend(0xF2FFFFFF, INK, f));
                 boolean locked = !keys && i >= COIN_ROWS && !Prefs.quotes();
@@ -955,7 +1117,7 @@ public class SettingsActivity extends Activity {
                 c.drawText(values[i], rowRect.right - 30 * k, base, rowValue);
             }
             Paint hint = Ui.text(Ui.regular, 23 * k, 0x8CFFFFFF);
-            float hy = (LIST_TOP + 20 + labels.length * (LIST_ROW_H + LIST_ROW_GAP) + 36) * k;
+            float hy = (LIST_TOP + 20 + labels.length * pitch + 36) * k;
             c.drawText(Ui.tr("OK or the arrows change the value."), LIST_X * k + 30 * k, hy, hint);
             if (keys) {
                 c.drawText(RemoteKeys.VESTEL ? Ui.tr("YouTube, Prime Video and Google Play: the TV itself controls those buttons.")
@@ -1001,6 +1163,10 @@ public class SettingsActivity extends Activity {
                 openPicker(focus + 1);
             } else if (screen == HOME_SETTINGS && focus == 0) {
                 openPicker(PICK_LANGUAGE);
+            } else if (screen == HOME_SETTINGS && focus == SAVER_ROW) {
+                pause();
+                activity.showPreview();   // the real screensaver, in the picked style, until any key
+                return;
             } else if (screen == HOME_SETTINGS && focus == CITY_ROW) {
                 askCity();
                 return;

@@ -46,6 +46,8 @@ var Prefs = (function () {
     language: function () { return pick('language', CONFIG.language || 'auto'); },
     temperature: function () { return pick('temperature', CONFIG.temperature || 'auto'); },
     theme: function () { return pick('theme', 'auto'); },
+    /** 'photos' (the picks' photos) or a gradient (SAVER_GRADIENTS in home.js). */
+    screensaver: function () { return pick('screensaver', CONFIG.screensaver || 'photos'); },
     weather: function () { return pick('weather', true); },
     quotes: function () { return pick('quotes', CONFIG.showCrypto !== false); },
     coin: function (i) { var c = pick('coins', null); return c ? c[i] !== false : true; },

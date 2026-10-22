@@ -38,6 +38,8 @@ import java.util.concurrent.Executors;
  *  - bottom left, the photo's caption: the time-of-day label ("TONIGHT"), the title, and genre · runtime · service.
  * Dark scrims only where there is text, stronger where the photo is bright. Any key exits (as on Apple TV).
  * Without photos (no TMDB key, or before the first fetch): the big clock over the night aurora.
+ * Home Settings can swap the photos for a color gradient (GRADIENTS): the same corner, over a gradient that drifts slowly
+ * (zoom and pan, like the photos, without the crossfades), darker at night.
  */
 final class DreamView extends View implements Choreographer.FrameCallback, HomeData.Listener, Recs.Listener {
     private static final long SHOW_MS = 30_000, FADE_MS = 3_000, FIRST_MS = 1_600;
@@ -47,6 +49,19 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
     private static final float MARGIN = 80, RIGHT = 1840, TITLE_W = 900, META_BASE = 1008;
     private static final float DATE_BASE = 92, CLOCK_TOP = 120, CLOCK_SIZE = 200, QUOTES_GAP = 52;
     private static final double DRIFT_PERIOD_S = 600;
+    /** Home Settings > Screensaver: the picks' photos, or one of the gradients (in the same order as GRADIENTS). */
+    static final String[] SAVERS = {"photos", "sunset", "ocean", "forest", "twilight", "ember", "graphite"};
+    /** Each gradient: the glow at the bottom, the middle and the top (deep, so the white clock reads). Same in web/home.js. */
+    private static final int[][] GRADIENTS = {
+            {0xFFFF9A62, 0xFFC2457A, 0xFF2E1745},   // sunset
+            {0xFF4FD1E8, 0xFF2263B8, 0xFF0A1A3D},   // ocean
+            {0xFF8EE0A8, 0xFF1F7A62, 0xFF0A2622},   // forest
+            {0xFFC8A6FF, 0xFF5B4BC4, 0xFF120F33},   // twilight
+            {0xFFFFB347, 0xFFC0392B, 0xFF2A0B0E},   // ember
+            {0xFFA7AEBB, 0xFF3C414B, 0xFF0D0E11},   // graphite
+    };
+    /** How much darker the gradient is at night (the room is dark too). */
+    private static final float NIGHT_DIM = 0.35f;
     // The high and low and the stale prices line, made again only when they change (drawn on every frame).
     private String range = "", staleLine = "", staleFor = "";
     private HomeData.Weather rangeWeather;
@@ -116,6 +131,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
     private boolean running, dirty = true, chromeDirty = true;
     private boolean fallback;       // the aurora with the clock (no photos)
     private boolean decoding;
+    private int[] gradient;         // the gradient picked in Home Settings (null: the photos)
     private int generation, slides;
     private Slide current, incoming, prepared;
     private Glass glass;
@@ -133,8 +149,10 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
         @Override public void run() {
             if (!running) return;
             data.refreshIfStale();
-            recs.refreshIfStale();
-            recs.prefetchAll();
+            if (gradient == null) {
+                recs.refreshIfStale();
+                recs.prefetchAll();
+            }
             dirty = true;
             chromeDirty = true;
             prepareNext();
@@ -168,13 +186,18 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
         startedAt = clock();
         lastFrame = 0;
         failed.clear();
-        fallback = recs.showcase().isEmpty();
+        gradient = gradient(Prefs.screensaver());
+        fallback = gradient == null && recs.showcase().isEmpty();
         data.addListener(this);
         recs.addListener(this);
         data.refreshIfStale();
-        recs.refreshIfStale();
-        recs.prefetchAll();
-        prepareNext();
+        if (gradient == null) {
+            recs.refreshIfStale();
+            recs.prefetchAll();
+            prepareNext();
+        } else {
+            prepareGradient();
+        }
         handler.postDelayed(tick, 60_000);
         Choreographer.getInstance().postFrameCallback(this);
         invalidate();
@@ -260,7 +283,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
 
     /** Loads the next photo in the background (one at a time); once ready, it comes in at the right moment. */
     private void prepareNext() {
-        if (!running || decoding || prepared != null) return;
+        if (!running || decoding || prepared != null || gradient != null) return;
         List<Recs.Pick> list = recs.showcase();
         if (list.isEmpty()) return;
         Slide last = incoming != null ? incoming : current;
@@ -324,6 +347,99 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
         });
     }
 
+    // MARK: - Gradient
+
+    /** The gradient for a Home Settings choice, or null for the photos. */
+    static int[] gradient(String saver) {
+        for (int i = 1; i < SAVERS.length; i++) if (SAVERS[i].equals(saver)) return GRADIENTS[i - 1];
+        return null;
+    }
+
+    /** A Home Settings choice as shown there. */
+    static String saverName(String saver) {
+        switch (saver) {
+            case "sunset": return Ui.tr("Sunset");
+            case "ocean": return Ui.tr("Ocean");
+            case "forest": return Ui.tr("Forest");
+            case "twilight": return Ui.tr("Twilight");
+            case "ember": return Ui.tr("Ember");
+            case "graphite": return Ui.tr("Graphite");
+            default: return Ui.tr("Photos");
+        }
+    }
+
+    /**
+     * Paints the gradient in the background, as a photo the size of the others (and its small copy for the glass clock),
+     * so each frame only moves one bitmap, as with the photos: no shader on the TV's GPU, the same cost on a Mi Box 3.
+     */
+    private void prepareGradient() {
+        final int[] colors = gradient;
+        final float dim = data.isNight(System.currentTimeMillis()) ? NIGHT_DIM : 0;
+        final int gen = generation;
+        decoding = true;
+        worker.execute(() -> {
+            Bitmap image = null, frost = null;
+            try {
+                image = Backdrop.gpu(paintGradient(colors, dim, PW, PH));
+                frost = paintGradient(colors, dim, PW / Backdrop.PHOTO_FROST, PH / Backdrop.PHOTO_FROST);
+            } catch (Exception | OutOfMemoryError e) {
+                AppLog.w("screensaver: gradient: " + e.getMessage());
+            }
+            final Bitmap readyImage = image, readyFrost = frost;
+            handler.post(() -> {
+                if (gen != generation || readyImage == null || readyFrost == null) {
+                    if (readyImage != null) readyImage.recycle();
+                    if (readyFrost != null) readyFrost.recycle();
+                    if (gen == generation) {
+                        decoding = false;
+                        fallback = true;   // couldn't make it: the clock over the aurora
+                    }
+                    return;
+                }
+                decoding = false;
+                prepared = new Slide(null, readyImage, readyFrost, 0, 0, 0);
+                invalidate();
+            });
+        });
+    }
+
+    /** The gradient for a Home Settings choice at w × h (darker at night): the preview in Settings. */
+    static Bitmap gradientBitmap(String saver, boolean night, int w, int h) {
+        int[] colors = gradient(saver);
+        return colors == null ? null : paintGradient(colors, night ? NIGHT_DIM : 0, w, h);
+    }
+
+    /** A vertical gradient (deep at the top) with a soft glow rising from the bottom left and a fainter one at the right. */
+    private static Bitmap paintGradient(int[] colors, float dim, int w, int h) {
+        int glow = darker(colors[0], dim), mid = darker(colors[1], dim), deep = darker(colors[2], dim);
+        Bitmap b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+        Canvas c = new Canvas(b);
+        Paint p = new Paint(Paint.DITHER_FLAG);
+        p.setShader(new LinearGradient(0, 0, 0, h, deep, mid, Shader.TileMode.CLAMP));
+        c.drawRect(0, 0, w, h, p);
+        glow(c, p, w * 0.12f, h, w * 0.62f, h * 0.75f,
+                new int[] {glow, Ui.alpha(glow, 0.55f), Ui.alpha(glow, 0)}, new float[] {0, 0.45f, 1});
+        glow(c, p, w * 0.88f, h * 0.92f, w * 0.45f, h * 0.55f, new int[] {Ui.alpha(glow, 0.5f), Ui.alpha(glow, 0)}, null);
+        return b;
+    }
+
+    /** An elliptical glow (radii rx, ry) around cx, cy. */
+    private static void glow(Canvas c, Paint p, float cx, float cy, float rx, float ry, int[] colors, float[] stops) {
+        RadialGradient g = new RadialGradient(cx, cy, rx, colors, stops, Shader.TileMode.CLAMP);
+        Matrix m = new Matrix();
+        m.setScale(1, ry / rx, cx, cy);
+        g.setLocalMatrix(m);
+        p.setShader(g);
+        c.drawRect(cx - rx, cy - ry, cx + rx, cy + ry, p);
+    }
+
+    private static int darker(int color, float dim) {
+        float keep = 1 - dim;
+        int r = Math.round(((color >> 16) & 255) * keep), g = Math.round(((color >> 8) & 255) * keep);
+        int b = Math.round((color & 255) * keep);
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    }
+
     private Slide newSlide(Recs.Pick pick, Bitmap image, Bitmap frost, float lightCaption, float lightClock) {
         Slide s = new Slide(pick, image, frost, lightCaption, lightClock, slides++);
         if (w > 0) recordCaption(s);
@@ -375,6 +491,16 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
 
     /** Photo position and scale now: zoom from 1 to 1.1 (or back) and a pan toward a corner, never showing an edge. */
     private void place(Slide s, long up, float[] out) {
+        if (s.pick == null) {
+            // The gradient: a slow drift that never stops (a zoom and a pan on periods that don't line up).
+            double t = (up - s.startedAt) / 1000.0;
+            float z = 1 + ZOOM * (0.5f + 0.5f * (float) Math.sin(t * (2 * Math.PI / 97)));
+            float gx = w * (z - 1) / 2, gy = h * (z - 1) / 2;
+            out[0] = -gx * (1 + 0.85f * (float) Math.sin(t * (2 * Math.PI / 131)));
+            out[1] = -gy * (1 + 0.85f * (float) Math.cos(t * (2 * Math.PI / 113)));
+            out[2] = (float) w / s.image.getWidth() * z;
+            return;
+        }
         float u = Ui.clamp((up - s.startedAt) / (float) (SHOW_MS + FADE_MS));
         float f = s.zoomIn ? u : 1 - u;
         float z = 1 + ZOOM * f;
@@ -458,7 +584,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
      * background): each frame draws only the photo (the TV's GPU feels every full-screen layer). With the slow zoom,
      * they move a little along with the photo, which makes no difference to the text.
      */
-    private static Bitmap withScrims(Bitmap photo, float lightCaption, float lightClock) {
+    static Bitmap withScrims(Bitmap photo, float lightCaption, float lightClock) {
         int w = photo.getWidth(), h = photo.getHeight();
         Canvas c = new Canvas(photo);
         Paint p = new Paint(Paint.DITHER_FLAG);
@@ -675,6 +801,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
     // MARK: - Photo caption (bottom left)
 
     private void recordCaption(Slide s) {
+        if (s.pick == null) return;   // the gradient has no caption
         Canvas c = s.caption.beginRecording(w, h);
         try {
             float x = MARGIN * k, metaBase = META_BASE * k, titleBase = metaBase - 58 * k;
@@ -698,6 +825,7 @@ final class DreamView extends View implements Choreographer.FrameCallback, HomeD
 
     /** The caption fades out fast; the new one rises in once the photo has partly changed (like the home screen). */
     private void drawCaptions(Canvas c, long up) {
+        if (current.pick == null) return;
         if (incoming == null) {
             float a = current.startedAt == firstAt ? fadeIn(up - firstAt - 700, 900) : 1;
             current.caption.setAlpha(a);
