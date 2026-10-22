@@ -13,3 +13,6 @@ __pycache__/
 # macOS
 .DS_Store
 tools/.i18n-cache.json
+
+# Samsung Home button tool: reports and per-TV baselines (they hold the TV IP and its settings)
+home-button-reports/
