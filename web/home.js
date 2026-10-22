@@ -162,6 +162,7 @@
     focusRows($('settings'), st.row, st.zone === Z.SETTINGS);
     focusRows($('shelfedit'), st.edit, st.zone === Z.EDIT);
     setClass(body, 'drawer-open', st.zone === Z.DRAWER);
+    setClass(body, 'sheet-open', sheetOpen());
   }
 
   function focusRows(sheet, index, on) {
